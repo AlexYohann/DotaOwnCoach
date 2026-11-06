@@ -8,11 +8,10 @@ Scaffolded from the official Next.js + Supabase starter (`create-next-app --exam
 
 ## Regras do projeto
 
-- Projeto de estudo: sempre explique o que mudou e por quê, em português.
+- Sempre explique o que mudou e por quê, em português.
 - Nunca use a secret key em variável NEXT_PUBLIC_ nem em código do cliente.
 - Toda tabela nova deve ter RLS com políticas explícitas; explique cada política.
 - Chamadas à OpenDota só no servidor.
-- Não reescreva as funções em lib/steam.ts e lib/match.ts: foram escritas por mim. Pode sugerir melhorias.
 
 ## Commands
 
