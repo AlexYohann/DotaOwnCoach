@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Scaffolded from the official Next.js + Supabase starter (`create-next-app --example with-supabase`). No Dota/coach-specific code exists yet — everything under `app/`, `components/` and `lib/` is template code (auth flows, tutorial components, `/protected` demo page). The template's tutorial pieces (`components/tutorial/`, `hero.tsx`, `deploy-button.tsx`, `env-var-warning.tsx`, `hasEnvVars`) are meant to be removed as real features land.
+Scaffolded from the official Next.js + Supabase starter (`create-next-app --example with-supabase`). Versioned with SemVer: `version` in `package.json`, a `CHANGELOG.md` entry and an annotated git tag `vX.Y.Z` per release.
+
+Dota features so far (no Supabase persistence yet):
+- `/` — Steam ID form (`components/steam-id-form.tsx`).
+- `/player/[id]` — profile + last 20 matches; validates the ID with `toAccountId` (`lib/steam.ts`).
+- `/match/[id]?player=` — match detail: both teams, items with hover preview, selected-hero stats panel (`components/match-view.tsx`, client).
+- `lib/opendota.ts` (`server-only`) is the only place that calls OpenDota. Heroes/items constants are cached 1 day, matches for weeks via `"use cache"`.
+
+**`"use cache"` gotcha:** an error thrown inside a cached function reaches the caller as a generic `Error` (it goes through React serialization), so `instanceof OpenDotaError` / `.kind` break. Return a status object and call `cacheLife` conditionally instead — see `fetchMatch`.
+
+Template leftovers still present: auth pages, `/protected`, and tutorial pieces (`components/tutorial/`, `hero.tsx`, `deploy-button.tsx`, `env-var-warning.tsx`, `hasEnvVars`) — meant to be removed.
 
 ## Regras do projeto
 
@@ -28,6 +38,7 @@ Env: copy `.env.example` → `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and
 
 ## Stack notes that affect how code must be written
 
+- **`npx shadcn add` generates Tailwind v4 code** in this v3 project (`components.json` has `tailwind.config: ""`). After adding a component: import `cn` from `@/lib/utils` (not the `cn` npm package — uninstall it if added) and convert v4 syntax like `origin-(--var)` to `origin-[--var]`.
 - **Next.js 16** (`next: "latest"`, installed 16.x). Middleware lives in root `proxy.ts` exporting `proxy()` — the Next 16 name for `middleware.ts`. Don't create a `middleware.ts`.
 - **`cacheComponents: true`** in `next.config.ts`. Anything that reads request-time data (cookies, `createClient()` from `lib/supabase/server`, `getClaims()`) must sit inside a `<Suspense>` boundary, which is why the template wraps `AuthButton` and `UserDetails` in `Suspense`. Follow that pattern or the build fails.
 - **Tailwind CSS v3** with `tailwind.config.ts` and CSS variables in `app/globals.css`; shadcn/ui (new-york style, neutral base, lucide icons) — add components with `npx shadcn@latest add <name>`, they land in `components/ui/`. Use `cn()` from `lib/utils.ts` for class merging.
@@ -49,6 +60,6 @@ Rules carried over from the template (breaking them causes random logouts):
 - In `updateSession`, nothing may run between `createServerClient(...)` and `supabase.auth.getClaims()`, and the returned `supabaseResponse` must be returned as-is (or its cookies copied onto any new response).
 - Use `auth.getClaims()` to check the user server-side (not `getSession()`).
 
-**Route protection is global, not per-page:** `updateSession` redirects any unauthenticated request to `/auth/login` unless the path is `/`, starts with `/login`, or starts with `/auth`. A new public route must be added to that allowlist in `lib/supabase/proxy.ts`. Pages still re-check with `getClaims()` and `redirect()` as defense in depth (see `app/protected/page.tsx`).
+**Route protection is global, not per-page:** `updateSession` redirects any unauthenticated request to `/auth/login` unless the path is `/` or starts with `/login`, `/auth`, `/player` or `/match` (the last two are public while the app has no login). A new public route must be added to that allowlist in `lib/supabase/proxy.ts`. Pages still re-check with `getClaims()` and `redirect()` as defense in depth (see `app/protected/page.tsx`).
 
 Auth flow: forms in `components/*-form.tsx` call the browser client directly; email confirmation / password-reset links hit `app/auth/confirm/route.ts`, which calls `verifyOtp` and redirects to `?next=` (default `/`) or `/auth/error`.

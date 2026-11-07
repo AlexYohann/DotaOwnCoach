@@ -3,6 +3,19 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [1.2.0] — 2026-11-07
+
+### Adicionado
+- Botão "Ver partida" em cada linha do histórico → `/match/[id]`.
+- Tela da partida: placar, data, duração, os dois times (herói, jogador, K/D/A, itens + neutro) e Vitória/Derrota do jogador buscado, destacado como "(você)".
+- Clicar num herói mostra o painel dele: nível, K/D/A, GPM/XPM, last hits/denies, patrimônio, dano em heróis/torres, cura, itens, mochila e neutro.
+- Preview dos itens ao passar o mouse (ou focar com Tab): custo, atributos, habilidades, recarga e mana. Texto em inglês (vem assim da OpenDota).
+- Título da aba: "Dota Own Coach".
+
+### Técnico
+- Partidas em cache por semanas e lista de itens por 1 dia (`"use cache"`); falhas ficam só ~1 min.
+- Componentes compartilhados `hero-cell` e `status-message`; tooltip do shadcn (`radix-ui`).
+
 ## [1.1.0] — 2026-11-06
 
 ### Adicionado

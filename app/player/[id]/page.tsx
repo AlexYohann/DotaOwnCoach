@@ -1,12 +1,16 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
+import { HeroCell } from "@/components/hero-cell";
+import {
+  OpenDotaErrorMessage,
+  StatusMessage,
+} from "@/components/status-message";
+import { Button } from "@/components/ui/button";
 import { formatDuration, formatStartTime, isWin } from "@/lib/match";
 import {
   getHeroes,
   getPlayer,
   getRecentMatches,
-  OpenDotaError,
   type Hero,
   type PlayerProfile,
   type RecentMatch,
@@ -23,7 +27,7 @@ export default function PlayerPage({
 }) {
   return (
     <main className="min-h-screen flex flex-col items-center p-8">
-      <div className="w-full max-w-4xl flex flex-col gap-6">
+      <div className="w-full max-w-5xl flex flex-col gap-6">
         <Link href="/" className="text-sm underline">
           ← Nova busca
         </Link>
@@ -47,12 +51,12 @@ async function PlayerContent({
 
   if (accountId === null) {
     return (
-      <Message title="ID inválido">
+      <StatusMessage title="ID inválido">
         <p>
           &quot;{rawId}&quot; não é um Steam ID válido. Use o Friend ID (ex.:
           123456789) ou o SteamID64 (17 dígitos, começa com 7656119…).
         </p>
-      </Message>
+      </StatusMessage>
     );
   }
 
@@ -67,36 +71,18 @@ async function PlayerContent({
       getHeroes(),
     ]);
   } catch (err) {
-    if (err instanceof OpenDotaError && err.kind === "rate_limit") {
-      return (
-        <Message title="Limite de requisições atingido">
-          <p>
-            A OpenDota limitou as requisições (plano gratuito). Tente de novo
-            em alguns minutos.
-          </p>
-        </Message>
-      );
-    }
-    console.error(err);
-    return (
-      <Message title="OpenDota indisponível">
-        <p>
-          A OpenDota está fora do ar ou não respondeu a tempo. Tente de novo
-          mais tarde.
-        </p>
-      </Message>
-    );
+    return <OpenDotaErrorMessage error={err} />;
   }
 
   if (!profile) {
     return (
-      <Message title="Jogador não encontrado">
+      <StatusMessage title="Jogador não encontrado">
         <p>
           A OpenDota não conhece a conta {accountId}. Confira o ID. Se estiver
           certo, o perfil pode estar privado.
         </p>
         <p>{PUBLIC_DATA_TIP}</p>
-      </Message>
+      </StatusMessage>
     );
   }
 
@@ -104,12 +90,12 @@ async function PlayerContent({
 
   if (matches.length === 0) {
     return (
-      <Message title={`${name}: nenhuma partida encontrada`}>
+      <StatusMessage title={`${name}: nenhuma partida encontrada`}>
         <p>
           O jogador não tem partidas registradas ou o perfil está privado.
         </p>
         <p>{PUBLIC_DATA_TIP}</p>
-      </Message>
+      </StatusMessage>
     );
   }
 
@@ -129,6 +115,9 @@ async function PlayerContent({
             <th>Duração</th>
             <th>GPM/XPM</th>
             <th>LH</th>
+            <th>
+              <span className="sr-only">Detalhes</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -155,28 +144,19 @@ async function PlayerContent({
                 {m.gold_per_min}/{m.xp_per_min}
               </td>
               <td>{m.last_hits}</td>
+              <td className="text-right">
+                <Button asChild variant="outline" size="sm">
+                  {/* ?player= destaca e pré-seleciona este jogador na partida */}
+                  <Link href={`/match/${m.match_id}?player=${accountId}`}>
+                    Ver partida
+                  </Link>
+                </Button>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </section>
-  );
-}
-
-function HeroCell({ heroId, hero }: { heroId: number; hero?: Hero }) {
-  // Herói desconhecido (lista falhou ou herói novo ainda fora da lista).
-  if (!hero) return <span>hero_id {heroId}</span>;
-  return (
-    <div className="flex items-center gap-2">
-      <Image
-        src={hero.img}
-        alt={hero.name}
-        width={64}
-        height={36}
-        className="rounded-sm"
-      />
-      <span>{hero.name}</span>
-    </div>
   );
 }
 
@@ -187,19 +167,4 @@ function safeDecode(value: string): string {
   } catch {
     return value;
   }
-}
-
-function Message({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h1 className="text-xl font-bold">{title}</h1>
-      {children}
-    </section>
-  );
 }
