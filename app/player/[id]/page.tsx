@@ -1,10 +1,13 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
-import { formatDuration, isWin } from "@/lib/match";
+import { formatDuration, formatStartTime, isWin } from "@/lib/match";
 import {
+  getHeroes,
   getPlayer,
   getRecentMatches,
   OpenDotaError,
+  type Hero,
   type PlayerProfile,
   type RecentMatch,
 } from "@/lib/opendota";
@@ -55,10 +58,13 @@ async function PlayerContent({
 
   let profile: PlayerProfile | null;
   let matches: RecentMatch[];
+  let heroes: Record<number, Hero>;
   try {
-    [profile, matches] = await Promise.all([
+    // getHeroes nunca lança: se falhar, devolve {} e a tabela mostra o hero_id.
+    [profile, matches, heroes] = await Promise.all([
       getPlayer(accountId),
       getRecentMatches(accountId),
+      getHeroes(),
     ]);
   } catch (err) {
     if (err instanceof OpenDotaError && err.kind === "rate_limit") {
@@ -117,6 +123,7 @@ async function PlayerContent({
         <thead>
           <tr className="text-left border-b">
             <th className="py-2">Herói</th>
+            <th>Data</th>
             <th>Resultado</th>
             <th>K/D/A</th>
             <th>Duração</th>
@@ -127,7 +134,12 @@ async function PlayerContent({
         <tbody>
           {matches.map((m) => (
             <tr key={m.match_id} className="border-b">
-              <td className="py-2">hero_id {m.hero_id}</td>
+              <td className="py-2">
+                <HeroCell heroId={m.hero_id} hero={heroes[m.hero_id]} />
+              </td>
+              <td className="whitespace-nowrap">
+                {formatStartTime(m.start_time)}
+              </td>
               <td>
                 {m.radiant_win === null
                   ? "—"
@@ -148,6 +160,23 @@ async function PlayerContent({
         </tbody>
       </table>
     </section>
+  );
+}
+
+function HeroCell({ heroId, hero }: { heroId: number; hero?: Hero }) {
+  // Herói desconhecido (lista falhou ou herói novo ainda fora da lista).
+  if (!hero) return <span>hero_id {heroId}</span>;
+  return (
+    <div className="flex items-center gap-2">
+      <Image
+        src={hero.img}
+        alt={hero.name}
+        width={64}
+        height={36}
+        className="rounded-sm"
+      />
+      <span>{hero.name}</span>
+    </div>
   );
 }
 

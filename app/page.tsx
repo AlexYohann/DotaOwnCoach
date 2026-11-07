@@ -1,4 +1,5 @@
 import { SteamIdForm } from "@/components/steam-id-form";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -9,6 +10,21 @@ export default function Home() {
           Digite seu Steam ID para ver suas últimas 20 partidas.
         </p>
         <SteamIdForm />
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <p>
+            Não sabe seu Steam ID? Na página de conta da Steam ele aparece logo
+            abaixo do seu nome (&quot;ID Steam: 7656119…&quot;).
+          </p>
+          <Button asChild variant="outline" className="self-start">
+            <a
+              href="https://store.steampowered.com/account/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Ver meu Steam ID na Steam ↗
+            </a>
+          </Button>
+        </div>
       </div>
     </main>
   );
