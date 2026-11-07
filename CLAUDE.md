@@ -32,13 +32,16 @@ npm run dev        # dev server on http://localhost:3000
 npm run build      # production build (also type-checks)
 npm run lint       # eslint . (next/core-web-vitals + next/typescript)
 npx tsc --noEmit   # type-check only
+npm test           # vitest run (tests/**/*.test.ts)
 ```
 
-There is no test framework or test script configured.
+Tests (Vitest, `vitest.config.mts`) cover the pure helpers (`lib/steam.ts`, `lib/match.ts`), `lib/opendota.ts` with a stubbed `fetch`, and the cache rules in `lib/data.ts` with fake Supabase/OpenDota/`after()`. `server-only` is aliased to `tests/server-only-stub.ts`. Run `npm test` before every commit; when changing `lib/data.ts`, add a case for the new branch. Measure load time with `npm run build && npx next start` — dev-server timings include on-demand compilation and are not representative.
+
+Writes to Supabase in `lib/data.ts` run inside `after()` (from `next/server`) so the page never waits for them; keep it that way.
 
 Env: copy `.env.example` → `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (a legacy anon key value also works in that variable), plus `SUPABASE_SECRET_KEY` (`sb_secret_…`, server-only) for cache writes. A `.env.local` created before v1.3 lacks that line.
 
-Supabase MCP is configured for this project (`svwdwsawxduzeudpwtna`): apply new migrations with `apply_migration`, keep the `.sql` file in `supabase/migrations/` as the source, and run `get_advisors` (security) after DDL.
+Supabase MCP is configured for this project (same project as `NEXT_PUBLIC_SUPABASE_URL`): apply new migrations with `apply_migration`, keep the `.sql` file in `supabase/migrations/` as the source, and run `get_advisors` (security) after DDL.
 
 `npm run dev` (Next 16) generates an untracked `AGENTS.md` at the root.
 

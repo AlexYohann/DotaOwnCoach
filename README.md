@@ -120,6 +120,6 @@ npm run dev                  # http://localhost:3000
 
 Banco: aplique as migrações de `supabase/migrations/` no seu projeto Supabase (SQL Editor ou `supabase db push`). Sem a `SUPABASE_SECRET_KEY` o site funciona, mas não grava nada no banco.
 
-Outros comandos: `npm run build` (build de produção, também checa os tipos) e `npx tsc --noEmit` (só os tipos).
+Outros comandos: `npm test` (testes com Vitest), `npm run lint`, `npm run build` (build de produção, também checa os tipos) e `npx tsc --noEmit` (só os tipos).
 
 Para ver as próprias partidas, no Dota 2 ative **Configurações → Opções → Social → "Expor dados públicos de partidas"**.

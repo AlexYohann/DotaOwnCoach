@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createAdminClient, createReadClient } from "@/lib/supabase/admin";
 import {
   getHeroesFromApi,
@@ -55,26 +56,27 @@ type PlayerRow = {
 export async function getPlayerData(
   accountId: number,
 ): Promise<PlayerData | null> {
-  const db = createReadClient();
-
+  // As duas leituras saem juntas (uma ida ao banco em vez de duas em fila).
+  // Se o perfil estiver vencido, a leitura das partidas ainda serve de reserva
+  // para o caso "OpenDota fora".
+  const [{ data, error }, savedMatches] = await Promise.all([
+    createReadClient()
+      .from("players")
+      .select("*")
+      .eq("account_id", accountId)
+      .maybeSingle<PlayerRow>(),
+    readRecentMatches(accountId),
+  ]);
   let saved: PlayerRow | null = null;
-  const { data, error } = await db
-    .from("players")
-    .select("*")
-    .eq("account_id", accountId)
-    .maybeSingle<PlayerRow>();
   if (error) logDb("ler players", error);
   else saved = data;
 
-  if (saved && isFresh(saved.fetched_at, PLAYER_TTL_MS)) {
-    const matches = await readRecentMatches(accountId);
-    if (matches) {
-      return {
-        profile: rowToProfile(saved),
-        matches,
-        freshness: { source: "db", fetchedAt: new Date(saved.fetched_at) },
-      };
-    }
+  if (saved && savedMatches && isFresh(saved.fetched_at, PLAYER_TTL_MS)) {
+    return {
+      profile: rowToProfile(saved),
+      matches: savedMatches,
+      freshness: { source: "db", fetchedAt: new Date(saved.fetched_at) },
+    };
   }
 
   try {
@@ -83,20 +85,18 @@ export async function getPlayerData(
       getRecentMatches(accountId),
     ]);
     if (!profile) return null; // inexistente: não guarda nada
-    await savePlayer(profile, matches);
+    // Grava depois de responder: o usuário não espera as 3 gravações em fila.
+    after(() => savePlayer(profile, matches));
     return { profile, matches, freshness: { source: "api", fetchedAt: new Date() } };
   } catch (err) {
     // OpenDota falhou, mas temos dado antigo: melhor mostrar com aviso.
-    if (saved && err instanceof OpenDotaError) {
-      const matches = await readRecentMatches(accountId);
-      if (matches) {
-        console.warn(`[data] OpenDota falhou (${err.kind}); servindo dado salvo`);
-        return {
-          profile: rowToProfile(saved),
-          matches,
-          freshness: { source: "stale", fetchedAt: new Date(saved.fetched_at) },
-        };
-      }
+    if (saved && savedMatches && err instanceof OpenDotaError) {
+      console.warn(`[data] OpenDota falhou (${err.kind}); servindo dado salvo`);
+      return {
+        profile: rowToProfile(saved),
+        matches: savedMatches,
+        freshness: { source: "stale", fetchedAt: new Date(saved.fetched_at) },
+      };
     }
     throw err;
   }
@@ -227,23 +227,25 @@ export async function getMatchData(
 
   const match = await getMatch(matchId);
   if (!match) return null;
-
-  const admin = createAdminClient();
-  if (admin) {
-    const detail: StoredDetail = { version: DETAIL_VERSION, match };
-    const { error: e } = await admin.from("matches").upsert({
-      match_id: match.match_id,
-      start_time: new Date(match.start_time * 1000).toISOString(),
-      duration: match.duration,
-      radiant_win: match.radiant_win,
-      radiant_score: match.radiant_score,
-      dire_score: match.dire_score,
-      detail,
-      detail_fetched_at: new Date().toISOString(),
-    });
-    if (e) logDb("gravar matches.detail", e);
-  }
+  after(() => saveMatchDetail(match));
   return match;
+}
+
+async function saveMatchDetail(match: MatchDetail) {
+  const admin = createAdminClient();
+  if (!admin) return;
+  const detail: StoredDetail = { version: DETAIL_VERSION, match };
+  const { error } = await admin.from("matches").upsert({
+    match_id: match.match_id,
+    start_time: new Date(match.start_time * 1000).toISOString(),
+    duration: match.duration,
+    radiant_win: match.radiant_win,
+    radiant_score: match.radiant_score,
+    dire_score: match.dire_score,
+    detail,
+    detail_fetched_at: new Date().toISOString(),
+  });
+  if (error) logDb("gravar matches.detail", error);
 }
 
 // ---------------------------------------------------------------------------
@@ -265,14 +267,15 @@ export async function getHeroes(): Promise<Record<number, Hero>> {
 
   try {
     const heroes = await getHeroesFromApi();
-    const admin = createAdminClient();
-    if (admin) {
+    after(async () => {
+      const admin = createAdminClient();
+      if (!admin) return;
       const now = new Date().toISOString();
       const { error: e } = await admin
         .from("heroes")
         .upsert(heroes.map((h) => ({ ...h, updated_at: now })));
       if (e) logDb("gravar heroes", e);
-    }
+    });
     return toHeroMap(heroes);
   } catch (err) {
     console.error(err);

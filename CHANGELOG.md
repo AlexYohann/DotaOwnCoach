@@ -3,6 +3,17 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [1.3.1] — 2026-11-07
+
+### Melhorado
+- Páginas mais rápidas (medido em build de produção): jogador buscado na OpenDota 0,92 s → 0,36 s; jogador vindo do banco ~0,16 s → ~0,11 s. A primeira abertura de uma partida também deixa de esperar a gravação do detalhe.
+  - As gravações no Supabase rodam com `after()`, depois de a página ser enviada (antes eram 3 gravações em fila segurando a resposta).
+  - Perfil e partidas do jogador são lidos do banco ao mesmo tempo, não um depois do outro.
+
+### Técnico
+- Testes automatizados com Vitest (`npm test`): 53 testes cobrindo Steam ID, formatação, erros e conversão da OpenDota e todas as decisões do cache (dado novo, vencido, OpenDota fora, banco fora, sem secret key, versão do `detail`).
+- `@types/node` 20 → 24 (versão do Node em uso; exigido pelo Vitest).
+
 ## [1.3.0] — 2026-11-07
 
 ### Adicionado
