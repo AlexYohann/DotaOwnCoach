@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# gerado pelo `next dev` (Next 16); instruções do projeto ficam no CLAUDE.md
+/AGENTS.md
