@@ -6,15 +6,14 @@ import {
   StatusMessage,
 } from "@/components/status-message";
 import { Button } from "@/components/ui/button";
-import { formatDuration, formatStartTime, isWin } from "@/lib/match";
+import { getHeroes, getPlayerData, type PlayerData } from "@/lib/data";
 import {
-  getHeroes,
-  getPlayer,
-  getRecentMatches,
-  type Hero,
-  type PlayerProfile,
-  type RecentMatch,
-} from "@/lib/opendota";
+  formatDateTime,
+  formatDuration,
+  formatStartTime,
+  isWin,
+} from "@/lib/match";
+import type { Hero } from "@/lib/opendota";
 import { toAccountId } from "@/lib/steam";
 
 const PUBLIC_DATA_TIP =
@@ -60,21 +59,20 @@ async function PlayerContent({
     );
   }
 
-  let profile: PlayerProfile | null;
-  let matches: RecentMatch[];
+  let player: PlayerData | null;
   let heroes: Record<number, Hero>;
   try {
+    // Banco primeiro (10 min), OpenDota se vencido — ver lib/data.ts.
     // getHeroes nunca lança: se falhar, devolve {} e a tabela mostra o hero_id.
-    [profile, matches, heroes] = await Promise.all([
-      getPlayer(accountId),
-      getRecentMatches(accountId),
+    [player, heroes] = await Promise.all([
+      getPlayerData(accountId),
       getHeroes(),
     ]);
   } catch (err) {
     return <OpenDotaErrorMessage error={err} />;
   }
 
-  if (!profile) {
+  if (!player) {
     return (
       <StatusMessage title="Jogador não encontrado">
         <p>
@@ -86,6 +84,7 @@ async function PlayerContent({
     );
   }
 
+  const { profile, matches, freshness } = player;
   const name = profile.personaname ?? `Conta ${accountId}`;
 
   if (matches.length === 0) {
@@ -103,8 +102,15 @@ async function PlayerContent({
     <section className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold">{name}</h1>
       <p className="text-sm text-muted-foreground">
-        Account ID {accountId} · últimas {matches.length} partidas
+        Account ID {accountId} · últimas {matches.length} partidas · dados de{" "}
+        {formatDateTime(freshness.fetchedAt)}
       </p>
+      {freshness.source === "stale" && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          A OpenDota não respondeu agora. Mostrando os últimos dados salvos —
+          partidas mais recentes podem estar faltando.
+        </p>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left border-b">

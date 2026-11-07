@@ -6,13 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Scaffolded from the official Next.js + Supabase starter (`create-next-app --example with-supabase`). Versioned with SemVer: `version` in `package.json`, a `CHANGELOG.md` entry and an annotated git tag `vX.Y.Z` per release. The roadmap (what each next version contains and its "done when" criterion) lives in `README.md` — follow its numbering (renumbered from v1.3 because v1.1/v1.2 went beyond the original plan).
 
-Dota features so far (no Supabase persistence yet):
+Dota features so far:
 - `/` — Steam ID form (`components/steam-id-form.tsx`).
 - `/player/[id]` — profile + last 20 matches; validates the ID with `toAccountId` (`lib/steam.ts`).
 - `/match/[id]?player=` — match detail: both teams, items with hover preview, selected-hero stats panel (`components/match-view.tsx`, client).
-- `lib/opendota.ts` (`server-only`) is the only place that calls OpenDota. Heroes/items constants are cached 1 day, matches for weeks via `"use cache"`.
+- `lib/opendota.ts` (`server-only`) is the only place that calls OpenDota; it does no caching except the items list (`fetchItems`, `"use cache"` 1 day).
+- `lib/data.ts` (`server-only`) is what pages call: Supabase-first cache (v1.3). Player + recent matches 10 min, heroes 1 day, match `detail` forever (bump `DETAIL_VERSION` if its JSON shape changes). DB errors fall back to API-only; API down with saved data → `freshness.source = "stale"`.
+- Supabase tables (`supabase/migrations/`): `heroes`, `players`, `matches`, `player_matches` — RLS with public SELECT only, no write policies. Reads use `createReadClient()` (publishable key), writes `createAdminClient()` (`SUPABASE_SECRET_KEY`, returns `null` if unset → no writes). Both in `lib/supabase/admin.ts`.
 
-**`"use cache"` gotcha:** an error thrown inside a cached function reaches the caller as a generic `Error` (it goes through React serialization), so `instanceof OpenDotaError` / `.kind` break. Return a status object and call `cacheLife` conditionally instead — see `fetchMatch`.
+**`"use cache"` gotcha:** an error thrown inside a cached function reaches the caller as a generic `Error` (it goes through React serialization), so `instanceof OpenDotaError` / `.kind` break. Return a status object and call `cacheLife` conditionally instead, or catch everything at the wrapper (as `getItems` does).
 
 Template leftovers still present: auth pages, `/protected`, and tutorial pieces (`components/tutorial/`, `hero.tsx`, `deploy-button.tsx`, `env-var-warning.tsx`, `hasEnvVars`) — meant to be removed.
 
@@ -34,7 +36,11 @@ npx tsc --noEmit   # type-check only
 
 There is no test framework or test script configured.
 
-Env: copy `.env.example` → `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (a legacy anon key value also works in that variable).
+Env: copy `.env.example` → `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (a legacy anon key value also works in that variable), plus `SUPABASE_SECRET_KEY` (`sb_secret_…`, server-only) for cache writes. A `.env.local` created before v1.3 lacks that line.
+
+Supabase MCP is configured for this project (`svwdwsawxduzeudpwtna`): apply new migrations with `apply_migration`, keep the `.sql` file in `supabase/migrations/` as the source, and run `get_advisors` (security) after DDL.
+
+`npm run dev` (Next 16) generates an untracked `AGENTS.md` at the root.
 
 ## Stack notes that affect how code must be written
 

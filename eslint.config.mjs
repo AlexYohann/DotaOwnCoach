@@ -10,6 +10,8 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // Saída gerada (build/dev do Next) e rascunhos de ferramentas: não é código do projeto.
+  { ignores: [".next/**", "next-env.d.ts", ".remember/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 

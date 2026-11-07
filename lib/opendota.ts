@@ -94,6 +94,8 @@ export class OpenDotaError extends Error {
 
 /** Devolve o JSON, ou null em 404. Lança OpenDotaError nos demais problemas. */
 async function request<T>(path: string): Promise<T | null> {
+  // Uma linha por chamada REAL à API: é assim que se confere o cache (v1.3).
+  console.info(`[OpenDota] GET ${path}`);
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
@@ -140,34 +142,15 @@ export async function getRecentMatches(
 
 type RawHero = { id: number; localized_name: string; img: string };
 
-// Lista de heróis quase nunca muda: cache de 1 dia evita 1 chamada por visita.
-// Erros não são cacheados (a exceção sobe e a próxima visita tenta de novo).
-async function fetchHeroes(): Promise<Record<number, Hero>> {
-  "use cache";
-  cacheLife("days");
-
+/** Lista de heróis direto da API (sem cache — quem guarda é lib/data.ts). */
+export async function getHeroesFromApi(): Promise<Hero[]> {
   const data = await request<Record<string, RawHero>>("/constants/heroes");
   if (!data) throw new OpenDotaError("unavailable", "constants/heroes vazio");
-
-  const heroes: Record<number, Hero> = {};
-  for (const h of Object.values(data)) {
-    heroes[h.id] = {
-      id: h.id,
-      name: h.localized_name,
-      img: cdnUrl(h.img),
-    };
-  }
-  return heroes;
-}
-
-/** Mapa hero_id → Hero. Se a OpenDota falhar, devolve {} (página cai no hero_id). */
-export async function getHeroes(): Promise<Record<number, Hero>> {
-  try {
-    return await fetchHeroes();
-  } catch (err) {
-    console.error(err);
-    return {};
-  }
+  return Object.values(data).map((h) => ({
+    id: h.id,
+    name: h.localized_name,
+    img: cdnUrl(h.img),
+  }));
 }
 
 // OpenDota devolve "/apps/dota2/.../blink.png?t=123" — tira a query string.
@@ -235,36 +218,6 @@ type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral"> &
   Record<string, unknown>;
 type RawMatch = Omit<MatchDetail, "players"> & { players?: RawMatchPlayer[] };
 
-type MatchResult =
-  | { status: "ok"; match: MatchDetail }
-  | { status: "not_found" }
-  | { status: "error"; kind: OpenDotaErrorKind; message: string };
-
-// Partida terminada não muda: sucesso fica em cache por semanas.
-// Não lança erro de propósito: erro que sai de "use cache" passa pela
-// serialização do React e chega como Error genérico (perde OpenDotaError/kind).
-// Falhas viram resultado com cacheLife("seconds") (expira em ~1 min): partida
-// recém-jogada não fica "não encontrada" presa, e 429 ganha um respiro.
-async function fetchMatch(matchId: number): Promise<MatchResult> {
-  "use cache";
-
-  let data: RawMatch | null;
-  try {
-    data = await request<RawMatch>(`/matches/${matchId}`);
-  } catch (err) {
-    cacheLife("seconds");
-    return err instanceof OpenDotaError
-      ? { status: "error", kind: err.kind, message: err.message }
-      : { status: "error", kind: "unavailable", message: String(err) };
-  }
-  if (!data || !Array.isArray(data.players)) {
-    cacheLife("seconds");
-    return { status: "not_found" };
-  }
-  cacheLife("weeks");
-  return { status: "ok", match: toMatchDetail(data, data.players) };
-}
-
 function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
   const slots = (p: RawMatchPlayer, keys: string[]) =>
     keys.map((k) => (typeof p[k] === "number" ? (p[k] as number) : 0));
@@ -302,12 +255,11 @@ function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
 }
 
 /**
+ * Partida direto da API (sem cache — quem guarda é lib/data.ts).
  * null = partida não existe (ou a OpenDota ainda não a conhece).
- * Lança OpenDotaError (rate_limit / unavailable) — fora do cache, então o tipo chega intacto.
  */
 export async function getMatch(matchId: number): Promise<MatchDetail | null> {
-  const result = await fetchMatch(matchId);
-  if (result.status === "ok") return result.match;
-  if (result.status === "not_found") return null;
-  throw new OpenDotaError(result.kind, result.message);
+  const data = await request<RawMatch>(`/matches/${matchId}`);
+  if (!data || !Array.isArray(data.players)) return null;
+  return toMatchDetail(data, data.players);
 }

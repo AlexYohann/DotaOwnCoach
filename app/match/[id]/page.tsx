@@ -6,10 +6,9 @@ import {
   StatusMessage,
 } from "@/components/status-message";
 import { formatDuration, formatStartTime, isWin } from "@/lib/match";
+import { getHeroes, getMatchData } from "@/lib/data";
 import {
-  getHeroes,
   getItems,
-  getMatch,
   type Hero,
   type Item,
   type MatchDetail,
@@ -77,7 +76,7 @@ async function MatchContent({
   try {
     // getHeroes/getItems nunca lançam: se falharem, a página mostra os IDs.
     [match, heroes, items] = await Promise.all([
-      getMatch(Number(id)),
+      getMatchData(Number(id)), // banco primeiro; partida salva nunca é rebuscada
       getHeroes(),
       getItems(),
     ]);

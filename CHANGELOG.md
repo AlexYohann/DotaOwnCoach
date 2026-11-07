@@ -3,6 +3,19 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [1.3.0] — 2026-11-07
+
+### Adicionado
+- Dados da OpenDota guardados no Supabase: heróis, perfil do jogador, últimas partidas e detalhe de cada partida aberta.
+- Página do jogador mostra de quando são os dados ("dados de …").
+- Se a OpenDota estiver fora e houver dado salvo, a página mostra o dado antigo com um aviso, em vez de erro.
+
+### Técnico
+- Migração `supabase/migrations/20261107000000_v1_3_cache.sql`: tabelas `heroes`, `players`, `matches` e `player_matches`. RLS ligado em todas, só com política de leitura pública; sem política de escrita (= negado). O servidor grava com `SUPABASE_SECRET_KEY` (`lib/supabase/admin.ts`, `server-only`).
+- `lib/data.ts` concentra a regra de cache: jogador + partidas recentes 10 min, heróis 1 dia, detalhe da partida para sempre (com versão do formato). Falha do banco cai no modo só-API.
+- `lib/opendota.ts` deixou de usar `"use cache"` para heróis, jogador e partidas (só a lista de itens continua no cache do Next).
+- ESLint ignora `.next/` (o lint estava lendo a saída do build) e `tailwind.config.ts` usa `import` em vez de `require`.
+
 ## [1.2.0] — 2026-11-07
 
 ### Adicionado

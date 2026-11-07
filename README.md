@@ -4,7 +4,7 @@ Coach pessoal de Dota 2: acompanhe as próprias partidas, anote o que deu certo 
 
 > Projeto de fã, não afiliado à Valve. Dota 2 é marca registrada da Valve Corporation. Dados de partidas pela [OpenDota](https://www.opendota.com/).
 
-**Versão atual: v1.2.0** · histórico detalhado no [CHANGELOG](CHANGELOG.md)
+**Versão atual: v1.3.0** · histórico detalhado no [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -30,6 +30,7 @@ Cada versão tem uma tag git (`vX.Y.Z`) e uma entrada no [CHANGELOG](CHANGELOG.m
 | **v1.0.0** | Busca por Steam ID (Friend ID ou SteamID64) e página do jogador com as últimas 20 partidas: resultado, K/D/A, duração, GPM/XPM e last hits. Mensagens claras para ID inválido, perfil privado, jogador inexistente, limite de requisições e OpenDota fora do ar. |
 | **v1.1.0** | Nome e imagem do herói no histórico, coluna de data e hora, e atalho para a página da Steam onde aparece o Steam ID. |
 | **v1.2.0** | Tela de detalhes da partida: os dois times com itens, painel com as estatísticas do herói selecionado e preview do que cada item faz ao passar o mouse. Título da aba "Dota Own Coach". |
+| **v1.3.0** | Dados guardados no Supabase (heróis, jogador, partidas e detalhes): recarregar a página não chama a OpenDota de novo por 10 minutos, e partida já aberta nunca é buscada outra vez. Se a OpenDota cair, mostra o último dado salvo com aviso. |
 
 As versões 1.1 e 1.2 foram além do plano original da v1 (a tela da partida estava prevista só para depois). Por isso o roteiro abaixo foi **renumerado a partir da v1.3**.
 
@@ -44,9 +45,9 @@ Cada etapa tem um critério de pronto, para dar para saber quando ela acabou de 
 - [x] **v1.0: busca básica.** Pronto quando: você digita seu ID e vê suas partidas corretas, com vitória e derrota certas.
 - [x] **v1.1: heróis.** Pronto quando: todas as partidas mostram o herói certo. *(Feito com a lista de heróis da OpenDota em cache no servidor. A tabela no Supabase entra na v1.3.)*
 - [x] **v1.2: detalhes da partida.** Adiantado do roteiro: times, itens, estatísticas por herói e preview dos itens.
-- [ ] **v1.3: dados no Supabase.**
+- [x] **v1.3: dados no Supabase.**
   - Tabela `heroes` com leitura pública via RLS, preenchida a partir da OpenDota.
-  - Tabelas `players` e `matches`, com leitura pública e escrita só pelo servidor (a secret key nunca vai em variável `NEXT_PUBLIC_`).
+  - Tabelas `players` e `matches`, com leitura pública e escrita só pelo servidor (a secret key nunca vai em variável `NEXT_PUBLIC_`). *(Entrou também `player_matches`: uma partida tem 10 jogadores, e dois usuários do site na mesma partida não podem sobrescrever um ao outro.)*
   - Regra de cache: se os dados têm menos de 10 minutos, vêm do banco; se não, busca na API e atualiza.
   - Pronto quando: recarregar a página várias vezes não gera novas chamadas à OpenDota (dá para conferir pelo `fetched_at` no Table Editor).
   - Por que no banco, se já existe cache no servidor: o cache atual fica na memória, separado por instância e apagado a cada deploy. O banco persiste e guarda o histórico de que a v3 precisa.
@@ -105,7 +106,7 @@ Quem quiser deixa uma partida pública para outros jogadores avaliarem o que err
 ## Stack
 
 - [Next.js 16](https://nextjs.org) (App Router, `cacheComponents`), React 19 e TypeScript
-- [Supabase](https://supabase.com) (auth via cookies com `@supabase/ssr`; tabelas a partir da v1.3)
+- [Supabase](https://supabase.com) (auth via cookies com `@supabase/ssr`; tabelas de cache com RLS desde a v1.3)
 - Tailwind CSS v3 + [shadcn/ui](https://ui.shadcn.com)
 - [OpenDota API](https://docs.opendota.com/) (plano gratuito; chamadas só no servidor)
 
@@ -113,9 +114,11 @@ Quem quiser deixa uma partida pública para outros jogadores avaliarem o que err
 
 ```bash
 npm install
-cp .env.example .env.local   # preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+cp .env.example .env.local   # preencha NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY e SUPABASE_SECRET_KEY
 npm run dev                  # http://localhost:3000
 ```
+
+Banco: aplique as migrações de `supabase/migrations/` no seu projeto Supabase (SQL Editor ou `supabase db push`). Sem a `SUPABASE_SECRET_KEY` o site funciona, mas não grava nada no banco.
 
 Outros comandos: `npm run build` (build de produção, também checa os tipos) e `npx tsc --noEmit` (só os tipos).
 

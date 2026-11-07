@@ -15,7 +15,12 @@ const startTimeFormat = new Intl.DateTimeFormat("pt-BR", {
 
 /** start_time (unix, segundos) -> "06/11/2026, 18:42" */
 export function formatStartTime(unixSeconds: number): string {
-  return startTimeFormat.format(new Date(unixSeconds * 1000));
+  return formatDateTime(new Date(unixSeconds * 1000));
+}
+
+/** Date -> "06/11/2026, 18:42" (horário de Brasília) */
+export function formatDateTime(date: Date): string {
+  return startTimeFormat.format(date);
 }
 
 /** 2519 -> "41:59" */
