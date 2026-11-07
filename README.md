@@ -10,11 +10,12 @@ Coach pessoal de Dota 2: acompanhe as próprias partidas, anote o que deu certo 
 
 ## Por que existe
 
-Sites de estatísticas mostram números, mas não ajudam a responder "o que eu preciso melhorar?". A ideia é juntar três coisas num lugar só:
+Sites de estatísticas mostram números, mas não ajudam a responder "o que eu preciso melhorar?". A ideia é juntar quatro coisas num lugar só:
 
 1. **Ver as partidas:** histórico com herói, resultado, K/D/A, farm e itens.
 2. **Refletir sobre elas:** um diário com uma nota por partida (o que errou, o que fez bem, tags como "farm ruim" ou "morri cedo").
 3. **Medir a evolução:** metas como "mortes ≤ 5" ou "last hits aos 10 min ≥ 50", acompanhadas ao longo das partidas.
+4. **Pedir uma segunda opinião:** quem quiser deixa uma partida pública para outros jogadores comentarem minuto a minuto.
 
 Também é um projeto de portfólio: web (Next.js + Supabase) e, mais adiante, app mobile usando o mesmo backend.
 
@@ -79,6 +80,25 @@ Cada etapa tem um critério de pronto, para dar para saber quando ela acabou de 
 - **Resumo da semana:** texto gerado com IA a partir das notas e estatísticas (ex.: "você morreu mais nas partidas de suporte").
 - **Comparação com a party:** as próprias métricas ao lado das de amigos.
 - **App mobile com Expo:** mesmo Supabase, para consultar partidas e anotar no celular logo depois do jogo.
+
+### v5: revisão pela comunidade
+
+Quem quiser deixa uma partida pública para outros jogadores avaliarem o que errou, onde errou e o que poderia ser melhor. Depende da v2 (login e diário).
+
+- **Linha do tempo de cada jogador** na tela da partida: quando fechou cada item, quando pegou cada kill e quando morreu, além das curvas de ouro, XP e last hits minuto a minuto. Os dados existem na OpenDota (`purchase_log`, `kills_log`, `deaths_log`, `gold_t`, `xp_t`, `lh_t`). Assistências não têm horário próprio.
+- **Partida pública por escolha do dono, uma a uma.** O padrão continua privado.
+- **Comentários presos a um minuto** (ex.: "21:43, comprou BKB tarde"). Nova tabela `match_reviews`: quem avaliou, partida, minuto, categoria (farm, posicionamento, itens, decisão) e texto.
+- **RLS:**
+  - outros só veem a partida e os comentários se ela for pública;
+  - só usuário logado comenta, e ninguém comenta a própria partida;
+  - o dono pode apagar comentários na partida dele.
+- **Link compartilhável** `/review/[id]`.
+- **Depois, se houver uso:** lista de partidas pedindo avaliação, categorias e reputação dos avaliadores.
+- **Riscos:**
+  - **Começar sem avaliadores:** começar pela party e pelos amigos; a IA da v4 pode ser a primeira avaliadora.
+  - **Linha do tempo só em partida processada:** ela só existe em partidas que a OpenDota processou a partir do replay. Dá para pedir o processamento (`POST /request/{match_id}`, ainda não testado), mas só enquanto o replay existir, então o pedido precisa ser automático, logo após o jogo.
+  - **Comentários abusivos:** a moderação básica (só logado comenta, o dono apaga) entra desde o início.
+- **Pronto quando:** outra conta comenta um minuto específico da sua partida pública, e uma partida privada continua invisível para ela. Esse teste com duas contas é obrigatório.
 
 ---
 
