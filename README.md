@@ -99,13 +99,13 @@ Quem quiser deixa uma partida pública para outros jogadores avaliarem o que err
 - **Depois, se houver uso:** lista de partidas pedindo avaliação, categorias e reputação dos avaliadores.
 - **Riscos:**
   - **Começar sem avaliadores:** começar pela party e pelos amigos; a IA da v4 pode ser a primeira avaliadora.
-  - **Linha do tempo só em partida processada:** ela só existe em partidas que a OpenDota processou a partir do replay. Dá para pedir o processamento (`POST /request/{match_id}`, ainda não testado), mas só enquanto o replay existir, então o pedido precisa ser automático, logo após o jogo.
+  - **Linha do tempo só em partida processada:** ela só existe em partidas que a OpenDota processou a partir do replay. Dá para pedir o processamento (`POST /request/{match_id}`; testado em 2026-11-08: uma partida comum foi processada em segundos e passou a ter `purchase_log`), mas só enquanto o replay existir, então o pedido precisa ser automático, logo após o jogo.
   - **Comentários abusivos:** a moderação básica (só logado comenta, o dono apaga) entra desde o início.
 - **Pronto quando:** outra conta comenta um minuto específico da sua partida pública, e uma partida privada continua invisível para ela. Esse teste com duas contas é obrigatório.
 
 ### Ideias futuras (sem versão)
 
-- **Herói animado com os cosméticos que o jogador usava na partida.** Pedido do Alex (2026-11-07). Hoje não existe: as animações oficiais da Valve (`.webm` no CDN da Steam) mostram só o visual padrão do herói. A lista de cosméticos existe na OpenDota (`players[].cosmetics`, só em partidas processadas a partir do replay).
+- **Herói animado com os cosméticos que o jogador usava na partida.** Pedido do Alex (2026-11-07). Hoje não existe: as animações oficiais da Valve (`.webm` no CDN da Steam) mostram só o visual padrão do herói. A lista de cosméticos existia na OpenDota (`players[].cosmetics`), mas **no patch 60 ela vem vazia até em partidas processadas e profissionais** (conferido em 2026-11-08; no patch 56, jan/2025, vinha). Sem fonte de dados atual, esta ideia depende de achar outra (STRATZ? replay próprio?).
   - **O que exigiria:** os modelos 3D do herói e dos itens (arquivos do jogo, formato do Source 2), convertidos para um formato web (glTF), um renderizador 3D no navegador (ex.: three.js) e as animações do herói. Antes de começar, conferir se a Valve permite exibir esses arquivos num projeto de fã: redistribuir arquivos do jogo é diferente de linkar imagens do CDN.
   - **Passo intermediário (entra na v1.4):** mostrar os ícones e nomes dos cosméticos no painel do herói.
 

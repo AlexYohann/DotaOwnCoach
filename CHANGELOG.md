@@ -3,6 +3,11 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [1.4.2] — 2026-11-08
+
+### Corrigido
+- A tela da partida dizia "Sem cosméticos registrados nesta partida" em todas as partidas recentes. Causa: a OpenDota não entrega mais cosméticos no patch atual (60), nem em partidas processadas ou profissionais — só em partidas antigas (ex.: patch 56). Agora a seção só aparece quando há cosméticos.
+
 ## [1.4.1] — 2026-11-08
 
 ### Corrigido

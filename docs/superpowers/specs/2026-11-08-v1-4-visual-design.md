@@ -92,7 +92,7 @@ O site funciona, mas é "preto no branco": a home parece um formulário solto e 
 - Topo: "← Voltar às partidas de <jogador>" (quando há `?player=`).
 - Resumo: "Partida <id> · <data> · <duração>"; linha grande "**VITÓRIA** · RADIANT · 32 × 22" (resultado e lado do jogador buscado; placar de abates Radiant × Dire). Sem `?player=`: mostrar "Radiant venceu"/"Dire venceu" + placar.
 - Painel do selecionado: etiqueta "VOCÊ" (jogador buscado) ou "HERÓI SELECIONADO"; nome do herói, jogador · lado; K/D/A grande; estatísticas atuais (nível, GPM/XPM, LH/DN, patrimônio, dano em heróis, dano em torres, cura); itens (6) | mochila (3, menores) | neutro (redondo), com o preview de hover que já existe.
-- **Cosméticos** (novo): lista com ícone, nome e barra na cor da raridade. Só existe em partidas processadas pela OpenDota (`players[].cosmetics`); sem dados → "Sem cosméticos registrados nesta partida." Ícone ausente → placeholder neutro (visto: 3 de 6 do Lycan sem imagem).
+- **Cosméticos** (novo): lista com ícone, nome e barra na cor da raridade. Só existe em partidas processadas pela OpenDota (`players[].cosmetics`); sem dados → a seção não aparece (v1.4.2: a OpenDota não entrega cosméticos no patch 60, nem processadas; a frase "sem cosméticos" enganava). Ícone ausente → placeholder neutro (visto: 3 de 6 do Lycan sem imagem).
 
 **Times** — alternância **Empilhados | Lado a lado**, lembrada no navegador (`localStorage`); padrão "Empilhados".
 - **Empilhados (completo)**: por time, cabeçalho "RADIANT · venceu" + "patrimônio total · dano em heróis total"; colunas: Herói, Jogador, Nív., K/D/A, LH/DN, GPM/XPM, Patrimônio, Dano heróis, Dano torres, Itens · mochila · neutro.

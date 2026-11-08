@@ -186,14 +186,11 @@ function PlayerPanel({ player: p }: { player: ViewPlayer }) {
   );
 }
 
+// A OpenDota só entrega cosméticos de partidas antigas (ex.: patch 56, jan/2025);
+// no patch 60 vêm vazios até em partidas processadas. Sem dados → sem seção
+// (uma frase "sem cosméticos" daria a entender que ninguém usava nada).
 function Cosmetics({ items }: { items: Cosmetic[] }) {
-  if (items.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Sem cosméticos registrados nesta partida.
-      </p>
-    );
-  }
+  if (items.length === 0) return null;
   return (
     <div>
       <p className={LABEL}>Cosméticos</p>
