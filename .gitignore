@@ -44,3 +44,6 @@ next-env.d.ts
 
 # gerado pelo `next dev` (Next 16); instruções do projeto ficam no CLAUDE.md
 /AGENTS.md
+
+# mockups do brainstorm (visual companion)
+/.superpowers/
