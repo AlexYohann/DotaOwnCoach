@@ -28,6 +28,10 @@ Template leftovers still present: auth pages, `/protected`, and tutorial pieces 
 - Toda tabela nova deve ter RLS com políticas explícitas; explique cada política.
 - Chamadas à OpenDota só no servidor.
 
+## Deploy
+
+Vercel project `dota-own-coach` → https://dota-own-coach.vercel.app, linked to GitHub `AlexYohann/DotaOwnCoach`: **every push to `main` deploys to production** (ask before pushing). Functions pinned to `gru1` in `vercel.json` (Supabase is `sa-east-1`). Env vars are set in the Vercel dashboard (same three as `.env.local`). Do not add the Vercel Marketplace "Supabase" integration — it would create/override a different database.
+
 ## Commands
 
 ```bash

@@ -4,7 +4,7 @@ Coach pessoal de Dota 2: acompanhe as próprias partidas, anote o que deu certo 
 
 > Projeto de fã, não afiliado à Valve. Dota 2 é marca registrada da Valve Corporation. Dados de partidas pela [OpenDota](https://www.opendota.com/).
 
-**Versão atual: v1.4.0** · histórico detalhado no [CHANGELOG](CHANGELOG.md)
+**Versão atual: v1.5.0** · no ar em https://dota-own-coach.vercel.app · histórico detalhado no [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -32,6 +32,7 @@ Cada versão tem uma tag git (`vX.Y.Z`) e uma entrada no [CHANGELOG](CHANGELOG.m
 | **v1.2.0** | Tela de detalhes da partida: os dois times com itens, painel com as estatísticas do herói selecionado e preview do que cada item faz ao passar o mouse. Título da aba "Dota Own Coach". |
 | **v1.3.0** | Dados guardados no Supabase (heróis, jogador, partidas e detalhes): recarregar a página não chama a OpenDota de novo por 10 minutos, e partida já aberta nunca é buscada outra vez. Se a OpenDota cair, mostra o último dado salvo com aviso. |
 | **v1.3.1** | Páginas mais rápidas (gravações no banco não seguram mais a resposta) e testes automatizados com Vitest. |
+| **v1.5.0** | Primeiro deploy: https://dota-own-coach.vercel.app (Vercel, funções em São Paulo junto do banco). |
 | **v1.4.0** | Visual novo, só escuro: heróis animados oficiais da Valve, home estilo capa com link para o código de amigo da Steam, página do jogador com a última partida em destaque e o herói mais jogado, tela da partida com o herói selecionado ao fundo, cosméticos, times em dois modos (completo / lado a lado) e ordenação por coluna. |
 
 As versões 1.1 e 1.2 foram além do plano original da v1 (a tela da partida estava prevista só para depois). Por isso o roteiro abaixo foi **renumerado a partir da v1.3**.
@@ -57,7 +58,7 @@ Cada etapa tem um critério de pronto, para dar para saber quando ela acabou de 
   - Mini design system (paleta, fontes, espaçamento), aprovado antes de aplicar, com prints de referência e rodadas de crítica. O shadcn/ui já está instalado.
   - Rodapé com "Projeto de fã, não afiliado à Valve".
   - Pronto quando: você mostraria a página para alguém sem vergonha.
-- [ ] **v1.5: primeiro deploy.**
+- [x] **v1.5: primeiro deploy.** No ar em https://dota-own-coach.vercel.app
   - Vercel, com as variáveis de ambiente (inclusive a secret) e as funções na região de São Paulo (`gru1`). O repositório já está no GitHub.
   - No Supabase, colocar a URL da Vercel em Authentication → URL Configuration.
   - Pronto quando: o site funciona na URL `.vercel.app`.

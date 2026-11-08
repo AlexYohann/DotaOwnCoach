@@ -3,6 +3,16 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [1.5.0] — 2026-11-08
+
+### Adicionado
+- Site no ar: https://dota-own-coach.vercel.app (Vercel, deploy automático a cada push na `main`).
+
+### Técnico
+- `vercel.json`: funções em `gru1` (São Paulo), ao lado do Supabase (`sa-east-1`, conferido pelo IP do banco).
+- Variáveis de ambiente na Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (só no servidor).
+- Conferido no ar: as três telas, animação, gravação no banco pela função publicada; tempo com função aquecida ~0,2 s (jogador) e ~0,35 s (partida).
+
 ## [1.4.2] — 2026-11-08
 
 ### Corrigido
