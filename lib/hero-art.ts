@@ -57,3 +57,27 @@ export const RARITY_COLORS: Record<string, string> = {
 export function rarityColor(rarity: string): string {
   return RARITY_COLORS[rarity] ?? RARITY_COLORS.common;
 }
+
+// Animação dos heróis: sempre animada por padrão (decisão do Alex, 2026-11-08,
+// mesmo com "reduzir movimento" no sistema), com botão de pausar salvo no navegador.
+export type HeroMotion = "playing" | "paused";
+const MOTION_KEY = "dota-own-coach:hero-motion";
+type PrefStorage = Pick<Storage, "getItem" | "setItem">;
+
+/** Preferência salva; nada salvo, valor estranho ou armazenamento bloqueado → "playing". */
+export function readHeroMotion(storage: PrefStorage | null): HeroMotion {
+  try {
+    return storage?.getItem(MOTION_KEY) === "paused" ? "paused" : "playing";
+  } catch {
+    return "playing";
+  }
+}
+
+/** Salva a preferência; se o navegador bloquear, vale só nesta visita (nunca lança). */
+export function saveHeroMotion(storage: PrefStorage | null, motion: HeroMotion): void {
+  try {
+    storage?.setItem(MOTION_KEY, motion);
+  } catch {
+    // sem armazenamento
+  }
+}

@@ -3,6 +3,11 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [1.4.1] — 2026-11-08
+
+### Corrigido
+- Heróis apareciam parados para quem tem "Efeitos de animação" desligado no Windows (preferência "reduzir movimento"). Agora a animação toca sempre, e um botão "⏸ Pausar animação" / "▶ Animar" no canto do cabeçalho para e retoma — a escolha fica salva no navegador (decisão do Alex).
+
 ## [1.4.0] — 2026-11-08
 
 ### Adicionado

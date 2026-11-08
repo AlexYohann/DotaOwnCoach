@@ -124,4 +124,5 @@ O site funciona, mas é "preto no branco": a home parece um formulário solto e 
 
 ## Decidido depois dos mockups
 
+- **Animação sempre ligada + botão de pausar** (Alex, 2026-11-08, v1.4.1): a regra "`prefers-reduced-motion` → só estática" foi trocada. O Windows do Alex tem "Efeitos de animação" desligado e os heróis apareciam parados. Agora anima sempre; botão "⏸ Pausar animação" / "▶ Animar" no cabeçalho, salvo no navegador (atende WCAG 2.2.2).
 - **Tema só escuro** (Alex, 2026-11-08): site fixo no tema escuro; remover o seletor de tema do template (`theme-switcher.tsx`) e o modo claro.
