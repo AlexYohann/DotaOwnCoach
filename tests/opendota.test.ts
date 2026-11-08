@@ -161,6 +161,42 @@ describe("getMatch", () => {
     expect(p2.items).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
+  it("copia os cosméticos (nome, raridade, ícone) e só esses campos", async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        match_id: 1,
+        players: [
+          {
+            player_slot: 0,
+            hero_id: 4,
+            cosmetics: [
+              {
+                name: "Maw of Eztzhok",
+                item_rarity: "immortal",
+                image_path: "icons/econ/items/x.png",
+                item_description: "#DOTA_Item_Desc",
+                prefab: "wearable",
+              },
+              { name: "Sem imagem" },
+              { item_rarity: "rare" }, // sem nome: ignorado
+            ],
+          },
+          { player_slot: 128, hero_id: 2 }, // sem cosmetics (partida não processada)
+        ],
+      }),
+    );
+    const m = await getMatch(1);
+    expect(m!.players[0].cosmetics).toEqual([
+      {
+        name: "Maw of Eztzhok",
+        rarity: "immortal",
+        img: "https://cdn.cloudflare.steamstatic.com/apps/570/icons/econ/items/x.png",
+      },
+      { name: "Sem imagem", rarity: "common", img: null },
+    ]);
+    expect(m!.players[1].cosmetics).toEqual([]);
+  });
+
   it("radiant_win ausente vira null", async () => {
     fetchMock.mockResolvedValue(json({ match_id: 1, players: [] }));
     await expect(getMatch(1)).resolves.toMatchObject({ radiant_win: null });

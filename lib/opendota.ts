@@ -48,6 +48,13 @@ export type Item = {
   manaCost: number | null;
 };
 
+/** Cosmético usado na partida (só em partidas processadas pela OpenDota). */
+export type Cosmetic = {
+  name: string;
+  rarity: string; // "immortal", "mythical"… (padrão "common")
+  img: string | null; // null = a OpenDota não tem o ícone
+};
+
 export type MatchPlayer = {
   account_id: number | null; // null = jogador anônimo
   personaname: string | null;
@@ -68,6 +75,7 @@ export type MatchPlayer = {
   items: number[]; // item_0..item_5 (0 = vazio)
   backpack: number[]; // backpack_0..backpack_2
   neutral: number[]; // item_neutral + item_neutral2 (encantamento)
+  cosmetics: Cosmetic[];
 };
 
 export type MatchDetail = {
@@ -218,6 +226,20 @@ type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral"> &
   Record<string, unknown>;
 type RawMatch = Omit<MatchDetail, "players"> & { players?: RawMatchPlayer[] };
 
+type RawCosmetic = { name?: string; item_rarity?: string | null; image_path?: string | null };
+
+// Copia só nome, raridade e ícone (o objeto original tem ~15 campos).
+function toCosmetics(raw: unknown): Cosmetic[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as RawCosmetic[])
+    .filter((c) => typeof c?.name === "string" && c.name.length > 0)
+    .map((c) => ({
+      name: c.name!,
+      rarity: c.item_rarity || "common",
+      img: c.image_path ? `${STEAM_CDN}/apps/570/${c.image_path}` : null,
+    }));
+}
+
 function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
   const slots = (p: RawMatchPlayer, keys: string[]) =>
     keys.map((k) => (typeof p[k] === "number" ? (p[k] as number) : 0));
@@ -250,6 +272,7 @@ function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
       items: slots(p, ["item_0", "item_1", "item_2", "item_3", "item_4", "item_5"]),
       backpack: slots(p, ["backpack_0", "backpack_1", "backpack_2"]),
       neutral: slots(p, ["item_neutral", "item_neutral2"]),
+      cosmetics: toCosmetics(p.cosmetics),
     })),
   };
 }
