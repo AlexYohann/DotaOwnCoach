@@ -15,8 +15,12 @@ export function HeroBanner({
   alt,
   caption,
   illustration = true,
+  tall = false,
+  nav,
   children,
 }: {
+  nav?: React.ReactNode; // barra do topo (SiteHeader), largura total
+  tall?: boolean; // capa da home: ocupa a altura da tela
   heroKey: string | null;
   poster: string | null;
   alt: string;
@@ -25,7 +29,9 @@ export function HeroBanner({
   children: React.ReactNode;
 }) {
   return (
-    <section className="relative isolate overflow-hidden min-h-[420px] pb-8">
+    <section
+      className={`relative isolate overflow-hidden pb-8 ${tall ? "flex-1 flex flex-col" : "min-h-[420px]"}`}
+    >
       {illustration && (
         <div
           aria-hidden
@@ -49,10 +55,13 @@ export function HeroBanner({
             "linear-gradient(90deg,rgba(11,13,16,.9) 0%,rgba(11,13,16,.45) 40%,rgba(11,13,16,0) 60%)",
         }}
       />
+      {nav && <div className="w-full max-w-6xl mx-auto px-6 py-4">{nav}</div>}
       {/* herói e texto no mesmo contêiner central: sem vão em tela larga */}
-      <div className="relative isolate w-full max-w-6xl mx-auto px-6 min-h-[380px]">
+      <div
+        className={`relative isolate w-full max-w-6xl mx-auto px-6 ${tall ? "flex-1 flex items-center min-h-[520px]" : "min-h-[380px]"}`}
+      >
         <div
-          className="absolute right-0 top-0 h-[380px] -z-10 opacity-30 md:opacity-100"
+          className={`absolute right-0 -z-10 opacity-30 md:opacity-100 ${tall ? "top-1/2 -translate-y-1/2 h-[min(560px,75vh)]" : "top-0 h-[380px]"}`}
           style={{ maskImage: FADE_BOTTOM, WebkitMaskImage: FADE_BOTTOM }}
         >
           <HeroRender heroKey={heroKey} poster={poster} alt={alt} />
