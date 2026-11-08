@@ -122,6 +122,6 @@ O site funciona, mas é "preto no branco": a home parece um formulário solto e 
 - Modo de times lembrado no navegador; padrão "Empilhados".
 - Ordenação: 3º clique volta à ordem original.
 
-## Pendências
+## Decidido depois dos mockups
 
-- **Tema claro**: o design é só escuro. Proposta: site fixo no tema escuro, removendo o seletor de tema do template. *(aguardando o Alex)*
+- **Tema só escuro** (Alex, 2026-11-08): site fixo no tema escuro; remover o seletor de tema do template (`theme-switcher.tsx`) e o modo claro.
