@@ -6,7 +6,7 @@ export function SiteHeader({ right }: { right?: React.ReactNode }) {
     <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
       <Link
         href="/"
-        className="font-display text-lg font-bold uppercase tracking-wide text-ink"
+        className="shrink-0 whitespace-nowrap font-display text-lg font-bold uppercase tracking-wide text-ink"
       >
         Dota <span className="text-ember">Own</span> Coach
       </Link>

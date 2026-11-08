@@ -154,7 +154,8 @@ async function PlayerContent({
         {top && <MostPlayedCard top={top} hero={heroes[top.heroId]} />}
       </HeroBanner>
 
-      <div className="w-full max-w-6xl mx-auto px-6 pb-10 overflow-x-auto">
+      {/* relative: os rótulos sr-only (absolutos) ficam presos aqui e não esticam a página no celular */}
+      <div className="relative w-full max-w-6xl mx-auto px-6 pb-10 overflow-x-auto">
         <MatchTable matches={matches} heroes={heroes} accountId={accountId} />
       </div>
     </>
@@ -226,7 +227,7 @@ function MatchTable({
   accountId: number;
 }) {
   return (
-    <table className="w-full text-sm">
+    <table className="w-full min-w-[760px] text-sm">
       <thead>
         <tr className="text-left text-xs text-muted-foreground border-b border-line">
           <th className="w-[3px] p-0">
