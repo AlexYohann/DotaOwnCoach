@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import { ThemeProvider } from "next-themes";
+import { Barlow_Condensed, Inter } from "next/font/google";
+import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -13,28 +13,34 @@ export const metadata: Metadata = {
   description: "Coach pessoal de Dota 2: acompanhe suas partidas.",
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Texto corrido.
+const inter = Inter({
+  variable: "--font-inter",
   display: "swap",
   subsets: ["latin"],
 });
 
+// Títulos (classe font-display): condensada, em maiúsculas.
+const display = Barlow_Condensed({
+  variable: "--font-display",
+  weight: ["600", "700"],
+  display: "swap",
+  subsets: ["latin"],
+});
+
+// v1.4: tema só escuro (cores em app/globals.css), sem seletor de tema.
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+    <html lang="pt-BR">
+      <body
+        className={`${inter.variable} ${display.variable} font-sans antialiased min-h-screen flex flex-col`}
+      >
+        <div className="flex-1 flex flex-col">{children}</div>
+        <SiteFooter />
       </body>
     </html>
   );

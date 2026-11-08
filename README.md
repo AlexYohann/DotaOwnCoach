@@ -4,7 +4,7 @@ Coach pessoal de Dota 2: acompanhe as próprias partidas, anote o que deu certo 
 
 > Projeto de fã, não afiliado à Valve. Dota 2 é marca registrada da Valve Corporation. Dados de partidas pela [OpenDota](https://www.opendota.com/).
 
-**Versão atual: v1.3.0** · histórico detalhado no [CHANGELOG](CHANGELOG.md)
+**Versão atual: v1.4.0** · histórico detalhado no [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -31,6 +31,8 @@ Cada versão tem uma tag git (`vX.Y.Z`) e uma entrada no [CHANGELOG](CHANGELOG.m
 | **v1.1.0** | Nome e imagem do herói no histórico, coluna de data e hora, e atalho para a página da Steam onde aparece o Steam ID. |
 | **v1.2.0** | Tela de detalhes da partida: os dois times com itens, painel com as estatísticas do herói selecionado e preview do que cada item faz ao passar o mouse. Título da aba "Dota Own Coach". |
 | **v1.3.0** | Dados guardados no Supabase (heróis, jogador, partidas e detalhes): recarregar a página não chama a OpenDota de novo por 10 minutos, e partida já aberta nunca é buscada outra vez. Se a OpenDota cair, mostra o último dado salvo com aviso. |
+| **v1.3.1** | Páginas mais rápidas (gravações no banco não seguram mais a resposta) e testes automatizados com Vitest. |
+| **v1.4.0** | Visual novo, só escuro: heróis animados oficiais da Valve, home estilo capa com link para o código de amigo da Steam, página do jogador com a última partida em destaque e o herói mais jogado, tela da partida com o herói selecionado ao fundo, cosméticos, times em dois modos (completo / lado a lado) e ordenação por coluna. |
 
 As versões 1.1 e 1.2 foram além do plano original da v1 (a tela da partida estava prevista só para depois). Por isso o roteiro abaixo foi **renumerado a partir da v1.3**.
 
@@ -51,7 +53,7 @@ Cada etapa tem um critério de pronto, para dar para saber quando ela acabou de 
   - Regra de cache: se os dados têm menos de 10 minutos, vêm do banco; se não, busca na API e atualiza.
   - Pronto quando: recarregar a página várias vezes não gera novas chamadas à OpenDota (dá para conferir pelo `fetched_at` no Table Editor).
   - Por que no banco, se já existe cache no servidor: o cache atual fica na memória, separado por instância e apagado a cada deploy. O banco persiste e guarda o histórico de que a v3 precisa.
-- [ ] **v1.4: visual.**
+- [x] **v1.4: visual.** Design aprovado em rodadas de mockup: `docs/superpowers/specs/2026-11-08-v1-4-visual-design.md`.
   - Mini design system (paleta, fontes, espaçamento), aprovado antes de aplicar, com prints de referência e rodadas de crítica. O shadcn/ui já está instalado.
   - Rodapé com "Projeto de fã, não afiliado à Valve".
   - Pronto quando: você mostraria a página para alguém sem vergonha.

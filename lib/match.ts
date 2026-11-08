@@ -3,6 +3,11 @@ export function isWin(playerSlot: number, radiantWin: boolean): boolean {
   return playerSlot < 128 === radiantWin;
 }
 
+/** Lado em que o jogador estava. */
+export function getSide(playerSlot: number): "Radiant" | "Dire" {
+  return playerSlot < 128 ? "Radiant" : "Dire";
+}
+
 // Fixo em horário de Brasília: o servidor (ex.: Vercel) roda em UTC.
 const startTimeFormat = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",

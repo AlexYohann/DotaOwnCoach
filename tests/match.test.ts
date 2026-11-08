@@ -3,6 +3,7 @@ import {
   formatDateTime,
   formatDuration,
   formatStartTime,
+  getSide,
   isWin,
 } from "@/lib/match";
 
@@ -52,5 +53,14 @@ describe("formatação de data (horário de Brasília)", () => {
   it("formatStartTime recebe segundos unix", () => {
     const unix = Date.UTC(2026, 10, 6, 21, 42) / 1000;
     expect(formatStartTime(unix)).toBe("06/11/2026, 18:42");
+  });
+});
+
+describe("getSide", () => {
+  it("slot < 128 é Radiant, >= 128 é Dire", () => {
+    expect(getSide(0)).toBe("Radiant");
+    expect(getSide(127)).toBe("Radiant");
+    expect(getSide(128)).toBe("Dire");
+    expect(getSide(132)).toBe("Dire");
   });
 });

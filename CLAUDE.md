@@ -6,15 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Scaffolded from the official Next.js + Supabase starter (`create-next-app --example with-supabase`). Versioned with SemVer: `version` in `package.json`, a `CHANGELOG.md` entry and an annotated git tag `vX.Y.Z` per release. The roadmap (what each next version contains and its "done when" criterion) lives in `README.md` — follow its numbering (renumbered from v1.3 because v1.1/v1.2 went beyond the original plan).
 
-Dota features so far:
-- `/` — Steam ID form (`components/steam-id-form.tsx`).
-- `/player/[id]` — profile + last 20 matches; validates the ID with `toAccountId` (`lib/steam.ts`).
-- `/match/[id]?player=` — match detail: both teams, items with hover preview, selected-hero stats panel (`components/match-view.tsx`, client).
+Dota features so far (v1.4 visual: design in `docs/superpowers/specs/2026-11-08-v1-4-visual-design.md`):
+- `/` — cover with a random animated hero (`components/home-hero.tsx`, client-side pick so the page stays static) + Steam ID form with the Steam friend-code link (`components/steam-id-form.tsx`).
+- `/player/[id]` — last match highlighted (hero animation, result · side · K/D/A), most-played card (`lib/player-summary.ts`), match table with side column; validates the ID with `toAccountId` (`lib/steam.ts`).
+- `/match/[id]?player=` — selected hero animated in the header, stats panel, cosmetics, team tables in two modes (full / compact, saved in `localStorage` `dota-own-coach:team-mode`) sortable per team (`lib/team-sort.ts`) (`components/match-view.tsx`, `team-tables.tsx`, `match-items.tsx`, client).
+- Shared visual pieces: `HeroBanner` (illustration + hero animation + content, never overlapping) and `HeroRender` (webm with fade-in; reduced-motion → still first frame; saveData/404/unknown hero → static image) in `components/`; Valve CDN URLs and rarity colors in `lib/hero-art.ts`. Dark theme only (no `next-themes`); palette as Tailwind colors `panel`, `line`, `ink`, `ember`, `win`, `loss`, `side` + `font-display` (Barlow Condensed). Side (Radiant/Dire) is always neutral text — never win/loss colors.
 - `lib/opendota.ts` (`server-only`) is the only place that calls OpenDota; it does no caching except the items list (`fetchItems`, `"use cache"` 1 day).
 - `lib/data.ts` (`server-only`) is what pages call: Supabase-first cache (v1.3). Player + recent matches 10 min, heroes 1 day, match `detail` forever (bump `DETAIL_VERSION` if its JSON shape changes). DB errors fall back to API-only; API down with saved data → `freshness.source = "stale"`.
 - Supabase tables (`supabase/migrations/`): `heroes`, `players`, `matches`, `player_matches` — RLS with public SELECT only, no write policies. Reads use `createReadClient()` (publishable key), writes `createAdminClient()` (`SUPABASE_SECRET_KEY`, returns `null` if unset → no writes). Both in `lib/supabase/admin.ts`.
 
 **`"use cache"` gotcha:** an error thrown inside a cached function reaches the caller as a generic `Error` (it goes through React serialization), so `instanceof OpenDotaError` / `.kind` break. Return a status object and call `cacheLife` conditionally instead, or catch everything at the wrapper (as `getItems` does).
+
+**Layout gotcha:** inside an `overflow-x-auto` wrapper, give the wrapper `relative` — absolutely positioned `sr-only` labels otherwise escape it and widen the whole page on mobile.
 
 Template leftovers still present: auth pages, `/protected`, and tutorial pieces (`components/tutorial/`, `hero.tsx`, `deploy-button.tsx`, `env-var-warning.tsx`, `hasEnvVars`) — meant to be removed.
 
