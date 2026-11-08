@@ -5,6 +5,7 @@ import {
   heroKey,
   heroRenderUrl,
   ILLUSTRATION_URL,
+  rarityColor,
 } from "@/lib/hero-art";
 
 describe("heroKey", () => {
@@ -61,5 +62,18 @@ describe("HOME_HEROES", () => {
     expect(HOME_HEROES).toHaveLength(12);
     expect(new Set(HOME_HEROES.map((h) => h.key)).size).toBe(12);
     for (const h of HOME_HEROES) expect(h.name.length).toBeGreaterThan(0);
+  });
+});
+
+describe("rarityColor", () => {
+  it("cores das raridades como no jogo", () => {
+    expect(rarityColor("immortal")).toBe("#e4ae39");
+    expect(rarityColor("mythical")).toBe("#8847ff");
+    expect(rarityColor("rare")).toBe("#4b69ff");
+    expect(rarityColor("arcana")).toBe("#ade55c");
+  });
+
+  it("raridade desconhecida usa a cor de common", () => {
+    expect(rarityColor("seasonal")).toBe("#b0c3d9");
   });
 });

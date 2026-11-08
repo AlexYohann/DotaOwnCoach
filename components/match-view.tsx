@@ -1,21 +1,19 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRef, useState } from "react";
+import { HeroBanner } from "@/components/hero-banner";
 import { HeroCell } from "@/components/hero-cell";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type { Item } from "@/lib/opendota"; // só o tipo: some no bundle do cliente
+import { ItemList, ItemRow, type ViewItem } from "@/components/match-items";
+import { ResultText, SideText } from "@/components/result-text";
+import { SiteHeader } from "@/components/site-header";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { rarityColor } from "@/lib/hero-art";
+import type { Cosmetic } from "@/lib/opendota"; // só o tipo
 import { cn } from "@/lib/utils";
 
-// Dados já resolvidos no servidor (nome/imagem de herói e itens), para não
-// mandar as listas inteiras de heróis/itens para o navegador.
-// img null = item que a lista da OpenDota não conhece.
-export type ViewItem = Omit<Item, "img"> & { img: string | null };
+export type { ViewItem };
 
 export type ViewPlayer = {
   slot: number;
@@ -24,6 +22,7 @@ export type ViewPlayer = {
   playerName: string;
   heroId: number;
   hero: { name: string; img: string } | null;
+  heroKey: string | null; // animação do herói (null = sem animação)
   level: number;
   kills: number;
   deaths: number;
@@ -39,28 +38,45 @@ export type ViewPlayer = {
   items: (ViewItem | null)[];
   backpack: (ViewItem | null)[];
   neutral: (ViewItem | null)[];
+  cosmetics: Cosmetic[];
 };
 
-export function MatchView({
-  players,
-  radiantWin,
-}: {
-  players: ViewPlayer[];
+/** Resumo da partida, já formatado no servidor. */
+export type MatchSummary = {
+  matchId: number;
+  when: string; // "20/01/2025, 13:12"
+  duration: string; // "49:36"
+  radiantScore: number;
+  direScore: number;
   radiantWin: boolean | null;
+  backHref: string;
+  backLabel: string;
+};
+
+const LABEL = "text-[10px] font-semibold uppercase tracking-[.12em] text-ember";
+
+export function MatchView({
+  summary,
+  players,
+}: {
+  summary: MatchSummary;
+  players: ViewPlayer[];
 }) {
   const [selectedSlot, setSelectedSlot] = useState(
     (players.find((p) => p.isSearched) ?? players[0])?.slot,
   );
   const selected = players.find((p) => p.slot === selectedSlot);
-  const detailRef = useRef<HTMLElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
 
-  // Painel fica acima dos times; ao trocar de herói, rola até ele (só se
-  // estiver fora da tela — "nearest" não mexe se já estiver visível).
+  // O painel fica no cabeçalho; ao escolher um herói nas tabelas, sobe até
+  // ele (só se estiver fora da tela — "nearest" não mexe se já estiver visível).
   function select(slot: number) {
     setSelectedSlot(slot);
-    detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  const me = players.find((p) => p.isSearched);
+  const { radiantWin } = summary;
   const teams = [
     { name: "Radiant", players: players.filter((p) => p.isRadiant), won: radiantWin === true },
     { name: "Dire", players: players.filter((p) => !p.isRadiant), won: radiantWin === false },
@@ -69,9 +85,51 @@ export function MatchView({
   return (
     // delay curto: o preview não pisca ao passar o mouse por cima dos ícones
     <TooltipProvider delayDuration={150}>
-      <div className="flex flex-col gap-6">
-        {selected && <PlayerDetail ref={detailRef} player={selected} />}
+      <div ref={topRef} className="scroll-mt-4">
+        <HeroBanner
+          heroKey={selected?.heroKey ?? null}
+          poster={selected?.hero?.img ?? null}
+          alt={selected?.hero?.name ?? ""}
+          nav={
+            <SiteHeader
+              right={
+                <Link href={summary.backHref} className="hover:text-ink">
+                  {summary.backLabel}
+                </Link>
+              }
+            />
+          }
+        >
+          <p className="text-xs text-muted-foreground">
+            Partida {summary.matchId} · {summary.when} · {summary.duration}
+          </p>
+          <p className="mt-2 flex flex-wrap items-baseline gap-x-3 font-display uppercase">
+            {me ? (
+              <>
+                <ResultText
+                  win={radiantWin === null ? null : me.isRadiant === radiantWin}
+                  className="text-4xl font-bold"
+                />
+                <span className="text-xl font-semibold tracking-wide">
+                  · <SideText side={me.isRadiant ? "Radiant" : "Dire"} /> ·
+                </span>
+              </>
+            ) : (
+              <span className="text-4xl font-bold">
+                {radiantWin === null ? "—" : radiantWin ? "Radiant venceu" : "Dire venceu"}
+              </span>
+            )}
+            <span className="text-4xl font-bold">
+              {summary.radiantScore}{" "}
+              <span className="text-2xl text-muted-foreground">×</span>{" "}
+              {summary.direScore}
+            </span>
+          </p>
+          {selected && <PlayerPanel player={selected} />}
+        </HeroBanner>
+      </div>
 
+      <div className="w-full max-w-6xl mx-auto px-6 pb-10 flex flex-col gap-6">
         {teams.map((team) => (
           <section key={team.name} className="flex flex-col gap-2">
             <h2 className="font-semibold">
@@ -137,20 +195,13 @@ export function MatchView({
   );
 }
 
-function PlayerDetail({
-  player: p,
-  ref,
-}: {
-  player: ViewPlayer;
-  ref: React.Ref<HTMLElement>;
-}) {
+function PlayerPanel({ player: p }: { player: ViewPlayer }) {
   const fmt = (n: number | null) =>
     n === null ? "—" : n.toLocaleString("pt-BR");
   const stats: [string, string][] = [
     ["Nível", String(p.level)],
-    ["K/D/A", `${p.kills}/${p.deaths}/${p.assists}`],
-    ["GPM/XPM", `${p.gpm}/${p.xpm}`],
-    ["Last hits / Denies", `${p.lastHits}/${p.denies}`],
+    ["GPM / XPM", `${p.gpm} / ${p.xpm}`],
+    ["Last hits / Denies", `${p.lastHits} / ${p.denies}`],
     ["Patrimônio", fmt(p.netWorth)],
     ["Dano em heróis", fmt(p.heroDamage)],
     ["Dano em torres", fmt(p.towerDamage)],
@@ -158,144 +209,84 @@ function PlayerDetail({
   ];
 
   return (
-    <section
-      ref={ref}
-      className="flex flex-col gap-3 border rounded-md p-4 scroll-mt-4"
-    >
-      <h2 className="font-semibold flex items-center gap-2">
-        <HeroCell heroId={p.heroId} hero={p.hero} />
-        <span className="text-muted-foreground font-normal">
-          · {p.playerName} · {p.isRadiant ? "Radiant" : "Dire"}
-        </span>
-      </h2>
-      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+    <section aria-live="polite" className="mt-6 flex flex-col gap-4">
+      <div>
+        <p className={LABEL}>{p.isSearched ? "Você" : "Herói selecionado"}</p>
+        <p className="flex flex-wrap items-baseline gap-x-3">
+          <span className="font-display text-3xl font-bold uppercase">
+            {p.hero?.name ?? `hero_id ${p.heroId}`}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {p.playerName} · <SideText side={p.isRadiant ? "Radiant" : "Dire"} />
+          </span>
+        </p>
+        <p className="font-display text-2xl font-bold">
+          {p.kills} / {p.deaths} / {p.assists}
+        </p>
+      </div>
+
+      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm w-fit">
         {stats.map(([label, value]) => (
           <div key={label}>
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="font-medium">{value}</dd>
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd className="font-semibold">{value}</dd>
           </div>
         ))}
       </dl>
+
       <div className="flex flex-col gap-2 text-sm">
         <ItemList label="Itens" items={p.items} />
         <ItemList label="Mochila" items={p.backpack} />
         <ItemList label="Neutro" items={p.neutral} />
       </div>
+
+      <Cosmetics items={p.cosmetics} />
     </section>
   );
 }
 
-/** Ícones compactos (tabela). */
-function ItemRow({ items }: { items: (ViewItem | null)[] }) {
+function Cosmetics({ items }: { items: Cosmetic[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Sem cosméticos registrados nesta partida.
+      </p>
+    );
+  }
   return (
-    <span className="flex gap-1">
-      {items.map((it, i) =>
-        it ? (
-          <ItemIcon key={i} item={it} />
-        ) : (
-          <span key={i} className="w-[33px] h-6 rounded-sm bg-muted" />
-        ),
-      )}
-    </span>
-  );
-}
-
-/** Ícones com nome (painel do herói selecionado). */
-function ItemList({
-  label,
-  items,
-}: {
-  label: string;
-  items: (ViewItem | null)[];
-}) {
-  const filled = items.filter((it): it is ViewItem => it !== null);
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-muted-foreground w-16">{label}</span>
-      {filled.length === 0 && <span className="text-muted-foreground">—</span>}
-      {filled.map((it, i) => (
-        <span key={i} className="flex items-center gap-1">
-          <ItemIcon item={it} />
-          <span>{it.name}</span>
-        </span>
-      ))}
+    <div>
+      <p className={LABEL}>Cosméticos</p>
+      <ul className="mt-2 flex flex-wrap gap-1.5">
+        {items.map((c, i) => (
+          <li
+            key={`${c.name}-${i}`}
+            title={c.rarity}
+            className="flex items-center gap-1.5 rounded border border-line border-l-[3px] bg-panel/85 py-0.5 pl-0.5 pr-2 text-xs"
+            style={{ borderLeftColor: rarityColor(c.rarity) }}
+          >
+            <CosmeticIcon src={c.img} />
+            {c.name}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-/** Ícone do item com preview (o que ele faz) ao passar o mouse ou focar. */
-function ItemIcon({ item }: { item: ViewItem }) {
+/** Ícone do cosmético; sem ícone ou com erro (404) → quadrado neutro. */
+function CosmeticIcon({ src }: { src: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <span aria-hidden className="h-[23px] w-[34px] rounded-sm bg-accent" />;
+  }
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {/* button = o preview também abre pelo teclado (Tab) */}
-        <button
-          type="button"
-          aria-label={item.name}
-          className="rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          {item.img ? (
-            <Image
-              src={item.img}
-              alt={item.name}
-              width={33}
-              height={24}
-              className="rounded-sm"
-            />
-          ) : (
-            <span className="w-[33px] h-6 rounded-sm bg-muted text-[10px] flex items-center justify-center">
-              #{item.id}
-            </span>
-          )}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={6} className="max-w-xs">
-        <ItemPreview item={item} />
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-const ABILITY_TYPE: Record<string, string> = {
-  active: "Ativa",
-  passive: "Passiva",
-  use: "Uso",
-  toggle: "Alternável",
-};
-
-function ItemPreview({ item }: { item: ViewItem }) {
-  const footer = [
-    item.cooldown !== null && `Recarga ${item.cooldown}s`,
-    item.manaCost !== null && `Mana ${item.manaCost}`,
-  ].filter(Boolean);
-
-  return (
-    <div className="flex flex-col gap-2 py-1 text-left">
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="font-semibold text-sm">{item.name}</span>
-        {item.cost !== null && (
-          <span className="opacity-80">
-            {item.cost.toLocaleString("pt-BR")} de ouro
-          </span>
-        )}
-      </div>
-      {item.stats.length > 0 && (
-        <ul>
-          {item.stats.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ul>
-      )}
-      {item.abilities.map((a) => (
-        <div key={a.title}>
-          <p className="font-semibold">
-            {ABILITY_TYPE[a.type] ?? a.type}: {a.title}
-          </p>
-          {/* descrições vêm com \n — pre-line respeita as quebras */}
-          <p className="whitespace-pre-line opacity-90">{a.description}</p>
-        </div>
-      ))}
-      {footer.length > 0 && <p className="opacity-80">{footer.join(" · ")}</p>}
-    </div>
+    <Image
+      src={src}
+      alt=""
+      width={34}
+      height={23}
+      onError={() => setFailed(true)}
+      className="h-[23px] w-[34px] rounded-sm object-cover"
+    />
   );
 }

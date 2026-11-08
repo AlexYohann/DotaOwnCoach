@@ -40,3 +40,20 @@ export const HOME_HEROES: { key: string; name: string }[] = [
   { key: "windrunner", name: "Windranger" },
   { key: "slark", name: "Slark" },
 ];
+
+/** Cores de raridade dos cosméticos, como no jogo. */
+export const RARITY_COLORS: Record<string, string> = {
+  common: "#b0c3d9",
+  uncommon: "#5e98d9",
+  rare: "#4b69ff",
+  mythical: "#8847ff",
+  legendary: "#d32ce6",
+  immortal: "#e4ae39",
+  arcana: "#ade55c",
+  ancient: "#eb4b4b",
+};
+
+/** Cor da raridade; desconhecida → cor de common. */
+export function rarityColor(rarity: string): string {
+  return RARITY_COLORS[rarity] ?? RARITY_COLORS.common;
+}
