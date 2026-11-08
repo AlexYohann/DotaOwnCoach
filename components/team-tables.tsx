@@ -6,16 +6,26 @@ import { ItemRow } from "@/components/match-items";
 import type { ViewPlayer } from "@/components/match-view";
 import {
   nextSort,
+  readTeamMode,
+  saveTeamMode,
   sortPlayers,
   teamTotal,
+  visibleSort,
   type SortKey,
   type SortState,
+  type TeamMode,
 } from "@/lib/team-sort";
 import { cn } from "@/lib/utils";
 
-type Mode = "full" | "compact";
-// Preferência do modo, guardada no navegador.
-const MODE_KEY = "dota-own-coach:team-mode";
+
+// Com armazenamento bloqueado, até acessar window.localStorage lança.
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 const fmt = (n: number | null) => (n === null ? "—" : n.toLocaleString("pt-BR"));
 
@@ -34,25 +44,26 @@ export function TeamTables({
   onSelect: (slot: number) => void;
   radiantWin: boolean | null;
 }) {
-  const [mode, setMode] = useState<Mode>("full");
+  const [mode, setMode] = useState<TeamMode>("full");
   const [sort, setSort] = useState<SortState>(null);
 
   // Lido depois de montar: o HTML do servidor é sempre "full" (sem diferença na hidratação).
   useEffect(() => {
-    const saved = localStorage.getItem(MODE_KEY);
-    if (saved === "full" || saved === "compact") setMode(saved);
+    setMode(readTeamMode(browserStorage()));
   }, []);
 
-  function changeMode(m: Mode) {
+  function changeMode(m: TeamMode) {
     setMode(m);
-    localStorage.setItem(MODE_KEY, m);
+    saveTeamMode(browserStorage(), m);
   }
 
-  const onSort = (k: SortKey) => setSort((s) => nextSort(s, k));
+  const onSort = (k: SortKey) => setSort((s) => nextSort(visibleSort(mode, s), k));
+  // No "Lado a lado" uma ordenação por coluna escondida não vale (nem aparece).
+  const shown = visibleSort(mode, sort);
   const teams = [
     { name: "Radiant", won: radiantWin === true, players: players.filter((p) => p.isRadiant) },
     { name: "Dire", won: radiantWin === false, players: players.filter((p) => !p.isRadiant) },
-  ].map((t) => ({ ...t, sorted: sortPlayers(t.players, sort) }));
+  ].map((t) => ({ ...t, sorted: sortPlayers(t.players, shown) }));
 
   const rowProps = { selectedSlot, onSelect };
 
@@ -96,13 +107,13 @@ export function TeamTables({
                   <tr className="border-b border-line text-left text-xs text-muted-foreground">
                     <th className="w-[17%] py-2 pl-2 font-medium">Herói</th>
                     <th className="w-[10%] font-medium">Jogador</th>
-                    <SortTh k="level" label="Nív." className="w-[4%]" sort={sort} onSort={onSort} />
-                    <SortTh k="kills" label="K/D/A" className="w-[6%]" sort={sort} onSort={onSort} />
-                    <SortTh k="lastHits" label="LH/DN" className="w-[6%]" sort={sort} onSort={onSort} />
-                    <SortTh k="gpm" label="GPM/XPM" className="w-[7%]" sort={sort} onSort={onSort} />
-                    <SortTh k="netWorth" label="Patrimônio" className="w-[7%]" sort={sort} onSort={onSort} />
-                    <SortTh k="heroDamage" label="Dano heróis" className="w-[6%]" sort={sort} onSort={onSort} />
-                    <SortTh k="towerDamage" label="Dano torres" className="w-[6%]" sort={sort} onSort={onSort} />
+                    <SortTh k="level" label="Nív." className="w-[4%]" sort={shown} onSort={onSort} />
+                    <SortTh k="kills" label="K/D/A" className="w-[6%]" sort={shown} onSort={onSort} />
+                    <SortTh k="lastHits" label="LH/DN" className="w-[6%]" sort={shown} onSort={onSort} />
+                    <SortTh k="gpm" label="GPM/XPM" className="w-[7%]" sort={shown} onSort={onSort} />
+                    <SortTh k="netWorth" label="Patrimônio" className="w-[7%]" sort={shown} onSort={onSort} />
+                    <SortTh k="heroDamage" label="Dano heróis" className="w-[6%]" sort={shown} onSort={onSort} />
+                    <SortTh k="towerDamage" label="Dano torres" className="w-[6%]" sort={shown} onSort={onSort} />
                     <th className="font-medium">Itens · mochila · neutro</th>
                   </tr>
                 </thead>
@@ -151,7 +162,7 @@ export function TeamTables({
                 <thead>
                   <tr className="border-b border-line text-left text-xs text-muted-foreground">
                     <th className="w-[42%] py-2 pl-2 font-medium">Herói</th>
-                    <SortTh k="kills" label="K/D/A" className="w-[16%]" sort={sort} onSort={onSort} />
+                    <SortTh k="kills" label="K/D/A" className="w-[16%]" sort={shown} onSort={onSort} />
                     <th className="font-medium">Itens</th>
                   </tr>
                 </thead>

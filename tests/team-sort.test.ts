@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { nextSort, sortPlayers, teamTotal, type SortKey } from "@/lib/team-sort";
+import {
+  nextSort,
+  readTeamMode,
+  saveTeamMode,
+  sortPlayers,
+  teamTotal,
+  visibleSort,
+  type SortKey,
+} from "@/lib/team-sort";
 
 type Row = Record<SortKey, number | null> & { id: string };
 
@@ -81,5 +89,56 @@ describe("teamTotal", () => {
 
   it("time sem nenhum valor: null (mostra —)", () => {
     expect(teamTotal([row("a", { heroDamage: null })], "heroDamage")).toBeNull();
+  });
+});
+
+describe("visibleSort", () => {
+  it("modo completo: vale a ordenação escolhida", () => {
+    expect(visibleSort("full", { key: "netWorth", dir: "desc" })).toEqual({ key: "netWorth", dir: "desc" });
+  });
+
+  it("lado a lado: só K/D/A aparece; outra coluna não ordena escondida", () => {
+    expect(visibleSort("compact", { key: "netWorth", dir: "desc" })).toBeNull();
+    expect(visibleSort("compact", { key: "kills", dir: "asc" })).toEqual({ key: "kills", dir: "asc" });
+  });
+});
+
+describe("readTeamMode / saveTeamMode", () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
+  };
+  const broken = {
+    getItem: () => {
+      throw new Error("SecurityError");
+    },
+    setItem: () => {
+      throw new Error("QuotaExceededError");
+    },
+  };
+
+  it("sem preferência ou valor inválido: completo", () => {
+    const s = mem();
+    expect(readTeamMode(s)).toBe("full");
+    s.setItem("dota-own-coach:team-mode", "xyz");
+    expect(readTeamMode(s)).toBe("full");
+  });
+
+  it("guarda e lê a preferência", () => {
+    const s = mem();
+    saveTeamMode(s, "compact");
+    expect(readTeamMode(s)).toBe("compact");
+  });
+
+  it("armazenamento bloqueado (navegação privada) não lança", () => {
+    expect(readTeamMode(broken)).toBe("full");
+    expect(() => saveTeamMode(broken, "compact")).not.toThrow();
+  });
+});
+
+describe("sem acesso ao localStorage (o próprio acesso lançou)", () => {
+  it("null: lê completo e salvar não faz nada", () => {
+    expect(readTeamMode(null)).toBe("full");
+    expect(() => saveTeamMode(null, "compact")).not.toThrow();
   });
 });
