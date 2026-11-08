@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextSort, sortPlayers, type SortKey } from "@/lib/team-sort";
+import { nextSort, sortPlayers, teamTotal, type SortKey } from "@/lib/team-sort";
 
 type Row = Record<SortKey, number | null> & { id: string };
 
@@ -66,5 +66,20 @@ describe("sortPlayers", () => {
     const copy = [...rows];
     sortPlayers(rows, { key: "netWorth", dir: "desc" });
     expect(rows).toEqual(copy);
+  });
+});
+
+describe("teamTotal", () => {
+  it("soma o campo do time ignorando valores ausentes", () => {
+    const team = [
+      row("a", { netWorth: 300 }),
+      row("b", { netWorth: null }),
+      row("c", { netWorth: 500 }),
+    ];
+    expect(teamTotal(team, "netWorth")).toBe(800);
+  });
+
+  it("time sem nenhum valor: null (mostra —)", () => {
+    expect(teamTotal([row("a", { heroDamage: null })], "heroDamage")).toBeNull();
   });
 });

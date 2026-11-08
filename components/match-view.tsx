@@ -4,14 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { HeroBanner } from "@/components/hero-banner";
-import { HeroCell } from "@/components/hero-cell";
-import { ItemList, ItemRow, type ViewItem } from "@/components/match-items";
+import { ItemList, type ViewItem } from "@/components/match-items";
 import { ResultText, SideText } from "@/components/result-text";
 import { SiteHeader } from "@/components/site-header";
+import { TeamTables } from "@/components/team-tables";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { rarityColor } from "@/lib/hero-art";
 import type { Cosmetic } from "@/lib/opendota"; // só o tipo
-import { cn } from "@/lib/utils";
 
 export type { ViewItem };
 
@@ -77,10 +76,6 @@ export function MatchView({
 
   const me = players.find((p) => p.isSearched);
   const { radiantWin } = summary;
-  const teams = [
-    { name: "Radiant", players: players.filter((p) => p.isRadiant), won: radiantWin === true },
-    { name: "Dire", players: players.filter((p) => !p.isRadiant), won: radiantWin === false },
-  ];
 
   return (
     // delay curto: o preview não pisca ao passar o mouse por cima dos ícones
@@ -129,67 +124,13 @@ export function MatchView({
         </HeroBanner>
       </div>
 
-      <div className="w-full max-w-6xl mx-auto px-6 pb-10 flex flex-col gap-6">
-        {teams.map((team) => (
-          <section key={team.name} className="flex flex-col gap-2">
-            <h2 className="font-semibold">
-              {team.name}
-              {team.won && " — Vitória"}
-            </h2>
-            {/* table-fixed + larguras fixas: colunas alinhadas entre os dois times */}
-            <table className="w-full text-sm table-fixed">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="py-2 w-[26%]">Herói</th>
-                  <th className="w-[24%]">Jogador</th>
-                  <th className="w-[12%]">K/D/A</th>
-                  <th>Itens</th>
-                </tr>
-              </thead>
-              <tbody>
-                {team.players.map((p) => (
-                  <tr
-                    key={p.slot}
-                    onClick={() => select(p.slot)}
-                    className={cn(
-                      "border-b cursor-pointer hover:bg-accent",
-                      p.slot === selectedSlot && "bg-accent",
-                    )}
-                  >
-                    <td className="py-2">
-                      {/* botão = selecionável por teclado; o clique na linha é atalho */}
-                      <button
-                        type="button"
-                        aria-pressed={p.slot === selectedSlot}
-                        onClick={(e) => {
-                          e.stopPropagation(); // a linha também tem onClick
-                          select(p.slot);
-                        }}
-                        className="text-left"
-                      >
-                        <HeroCell heroId={p.heroId} hero={p.hero} />
-                      </button>
-                    </td>
-                    <td className="truncate" title={p.playerName}>
-                      {p.playerName}
-                      {p.isSearched && (
-                        <span className="ml-1 text-xs text-muted-foreground">
-                          (você)
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {p.kills}/{p.deaths}/{p.assists}
-                    </td>
-                    <td>
-                      <ItemRow items={[...p.items, ...p.neutral]} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        ))}
+      <div className="w-full max-w-6xl mx-auto px-6 pb-10">
+        <TeamTables
+          players={players}
+          selectedSlot={selectedSlot}
+          onSelect={select}
+          radiantWin={radiantWin}
+        />
       </div>
     </TooltipProvider>
   );

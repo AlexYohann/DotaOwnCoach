@@ -34,3 +34,12 @@ export function sortPlayers<T extends Record<SortKey, number | null>>(
     return (x - y) * sign;
   });
 }
+
+/** Soma do campo no time, ignorando ausentes; null se ninguém tem o valor. */
+export function teamTotal<T extends Record<SortKey, number | null>>(
+  players: T[],
+  key: SortKey,
+): number | null {
+  const values = players.map((p) => p[key]).filter((v): v is number => v !== null);
+  return values.length ? values.reduce((a, b) => a + b, 0) : null;
+}

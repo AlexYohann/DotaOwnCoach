@@ -16,15 +16,29 @@ import type { Item } from "@/lib/opendota"; // só o tipo: some no bundle do cli
 // OpenDota não conhece.
 export type ViewItem = Omit<Item, "img"> & { img: string | null };
 
+// Tamanhos dos ícones (proporção 88×64 da imagem de item).
+const SIZES = {
+  md: { w: 33, h: 24, box: "w-[33px] h-6" },
+  sm: { w: 27, h: 20, box: "w-[27px] h-5" }, // tabela completa
+  xs: { w: 21, h: 15, box: "w-[21px] h-[15px]" }, // mochila na tabela completa
+} as const;
+export type ItemSize = keyof typeof SIZES;
+
 /** Ícones compactos (tabela). */
-export function ItemRow({ items }: { items: (ViewItem | null)[] }) {
+export function ItemRow({
+  items,
+  size = "md",
+}: {
+  items: (ViewItem | null)[];
+  size?: ItemSize;
+}) {
   return (
-    <span className="flex gap-1">
+    <span className="flex shrink-0 gap-1">
       {items.map((it, i) =>
         it ? (
-          <ItemIcon key={i} item={it} />
+          <ItemIcon key={i} item={it} size={size} />
         ) : (
-          <span key={i} className="w-[33px] h-6 rounded-sm bg-muted" />
+          <span key={i} className={`${SIZES[size].box} shrink-0 rounded-sm bg-muted`} />
         ),
       )}
     </span>
@@ -55,7 +69,8 @@ export function ItemList({
 }
 
 /** Ícone do item com preview (o que ele faz) ao passar o mouse ou focar. */
-export function ItemIcon({ item }: { item: ViewItem }) {
+export function ItemIcon({ item, size = "md" }: { item: ViewItem; size?: ItemSize }) {
+  const sz = SIZES[size];
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -63,18 +78,18 @@ export function ItemIcon({ item }: { item: ViewItem }) {
         <button
           type="button"
           aria-label={item.name}
-          className="rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           {item.img ? (
             <Image
               src={item.img}
               alt={item.name}
-              width={33}
-              height={24}
+              width={sz.w}
+              height={sz.h}
               className="rounded-sm"
             />
           ) : (
-            <span className="w-[33px] h-6 rounded-sm bg-muted text-[10px] flex items-center justify-center">
+            <span className={`${sz.box} rounded-sm bg-muted text-[9px] flex items-center justify-center`}>
               #{item.id}
             </span>
           )}
