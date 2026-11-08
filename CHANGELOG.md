@@ -3,6 +3,20 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [1.4.0] — 2026-11-08
+
+### Adicionado
+- Visual novo, só no tema escuro (paleta, fontes Barlow Condensed + Inter, rodapé "Projeto de fã, não afiliado à Valve.").
+- Heróis animados oficiais da Valve: herói sorteado na home, herói da última partida na página do jogador, herói selecionado na tela da partida. A animação nunca atrasa a página (entra depois, com fade); quem prefere menos movimento vê o primeiro quadro parado; sem animação disponível, aparece a imagem estática.
+- Home estilo capa, com link direto para o "Código de amigo" da Steam.
+- Página do jogador: última partida em destaque (resultado · lado · K/D/A), cartão do herói mais jogado nas últimas 20 e coluna "Lado" na tabela.
+- Tela da partida: cosméticos usados por cada jogador (com cor de raridade), times em dois modos (Empilhados, completo; Lado a lado, minimalista), lembrado no navegador, e ordenação por coluna dentro de cada time (maior → menor → original).
+
+### Técnico
+- `lib/hero-art.ts`, `lib/player-summary.ts`, `lib/team-sort.ts` com testes (81 no total); `DETAIL_VERSION` 2 (partidas salvas são rebuscadas uma vez para trazer os cosméticos).
+- Removidos `next-themes` e o seletor de tema.
+- Desempenho igual ao da v1.3.1 (A/B em build de produção: mediana ~0,27 s com cache vencido; ~0,07 s vindo do banco).
+
 ## [1.3.1] — 2026-11-07
 
 ### Melhorado
