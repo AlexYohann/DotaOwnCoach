@@ -4,7 +4,7 @@ Coach pessoal de Dota 2: acompanhe as próprias partidas, anote o que deu certo 
 
 > Projeto de fã, não afiliado à Valve. Dota 2 é marca registrada da Valve Corporation. Dados de partidas pela [OpenDota](https://www.opendota.com/).
 
-**Versão atual: v1.5.0** · no ar em https://dota-own-coach.vercel.app · histórico detalhado no [CHANGELOG](CHANGELOG.md)
+**Versão atual: v2.0.0** · no ar em https://dota-own-coach.vercel.app · histórico detalhado no [CHANGELOG](CHANGELOG.md)
 
 ---
 
