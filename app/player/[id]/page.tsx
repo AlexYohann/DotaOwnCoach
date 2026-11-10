@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
+import { HeaderAccountSlot } from "@/components/header-account";
 import { HeroBanner } from "@/components/hero-banner";
 import { HeroCell } from "@/components/hero-cell";
 import { PageShell } from "@/components/page-shell";
@@ -28,11 +29,9 @@ import { cn } from "@/lib/utils";
 const PUBLIC_DATA_TIP =
   'No Dota 2: Configurações → Opções → Social → ative "Expor dados públicos de partidas". Depois disso, pode levar um tempo até a OpenDota ver suas partidas novas.';
 
-const NEW_SEARCH = (
-  <Link href="/" className="hover:text-ink">
-    Buscar outro ID
-  </Link>
-);
+// Canto do cabeçalho (Entrar com a Steam / menu da conta). A busca por outro
+// ID agora fica no próprio cabeçalho, em todas as páginas.
+const ACCOUNT = <HeaderAccountSlot />;
 
 export default function PlayerPage({
   params,
@@ -44,7 +43,7 @@ export default function PlayerPage({
       {/* cacheComponents: dados de request (params, fetch) ficam dentro de Suspense */}
       <Suspense
         fallback={
-          <PageShell right={NEW_SEARCH}>
+          <PageShell account={ACCOUNT}>
             <p className="text-muted-foreground">Buscando partidas na OpenDota…</p>
           </PageShell>
         }
@@ -66,7 +65,7 @@ async function PlayerContent({
 
   if (accountId === null) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <StatusMessage title="ID inválido">
           <p>
             &quot;{rawId}&quot; não é um Steam ID válido. Use o código de amigo
@@ -88,7 +87,7 @@ async function PlayerContent({
     ]);
   } catch (err) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <OpenDotaErrorMessage error={err} />
       </PageShell>
     );
@@ -96,7 +95,7 @@ async function PlayerContent({
 
   if (!player) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <StatusMessage title="Jogador não encontrado">
           <p>
             A OpenDota não conhece a conta {accountId}. Confira o ID. Se estiver
@@ -113,7 +112,7 @@ async function PlayerContent({
 
   if (matches.length === 0) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <StatusMessage title={`${name}: nenhuma partida encontrada`}>
           <p>
             O jogador não tem partidas registradas ou o perfil está privado.
@@ -135,7 +134,7 @@ async function PlayerContent({
         heroKey={heroKey(lastHero?.img)}
         poster={lastHero?.img ?? null}
         alt={lastHero?.name ?? ""}
-        nav={<SiteHeader right={NEW_SEARCH} />}
+        nav={<SiteHeader account={ACCOUNT} />}
       >
         <h1 className="font-display text-4xl font-bold uppercase leading-none">
           {name}

@@ -6,6 +6,7 @@ import {
   type ViewItem,
   type ViewPlayer,
 } from "@/components/match-view";
+import { HeaderAccountSlot } from "@/components/header-account";
 import { PageShell } from "@/components/page-shell";
 import {
   OpenDotaErrorMessage,
@@ -37,7 +38,7 @@ export default function MatchPage({
       {/* cacheComponents: params/searchParams/fetch ficam dentro de Suspense */}
       <Suspense
         fallback={
-          <PageShell>
+          <PageShell account={<HeaderAccountSlot />}>
             <p className="text-muted-foreground">Buscando a partida na OpenDota…</p>
           </PageShell>
         }
@@ -71,7 +72,7 @@ async function MatchContent({
 
   if (!/^\d{1,20}$/.test(id)) {
     return (
-      <PageShell right={backLink}>
+      <PageShell right={backLink} account={<HeaderAccountSlot />}>
         <StatusMessage title="ID de partida inválido">
           <p>O ID de uma partida tem só números (ex.: 9070284784).</p>
         </StatusMessage>
@@ -91,7 +92,7 @@ async function MatchContent({
     ]);
   } catch (err) {
     return (
-      <PageShell right={backLink}>
+      <PageShell right={backLink} account={<HeaderAccountSlot />}>
         <OpenDotaErrorMessage error={err} />
       </PageShell>
     );
@@ -99,7 +100,7 @@ async function MatchContent({
 
   if (!match) {
     return (
-      <PageShell right={backLink}>
+      <PageShell right={backLink} account={<HeaderAccountSlot />}>
         <StatusMessage title="Partida não encontrada">
           <p>
             A OpenDota não tem a partida {id}. Se ela acabou agora, tente de
@@ -168,5 +169,7 @@ async function MatchContent({
     backLabel: back.label,
   };
 
-  return <MatchView summary={summary} players={players} />;
+  return (
+    <MatchView summary={summary} players={players} account={<HeaderAccountSlot />} />
+  );
 }

@@ -57,9 +57,11 @@ const LABEL = "text-[10px] font-semibold uppercase tracking-[.12em] text-ember";
 export function MatchView({
   summary,
   players,
+  account,
 }: {
   summary: MatchSummary;
   players: ViewPlayer[];
+  account: React.ReactNode; // HeaderAccountSlot (componente de servidor) vindo da página
 }) {
   const [selectedSlot, setSelectedSlot] = useState(
     (players.find((p) => p.isSearched) ?? players[0])?.slot,
@@ -87,6 +89,7 @@ export function MatchView({
           alt={selected?.hero?.name ?? ""}
           nav={
             <SiteHeader
+              account={account}
               right={
                 <Link href={summary.backHref} className="hover:text-ink">
                   {summary.backLabel}

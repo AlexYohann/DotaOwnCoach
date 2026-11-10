@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
         hostname: "cdn.cloudflare.steamstatic.com",
         pathname: "/apps/570/icons/**",
       },
+      {
+        // Avatar da Steam no cabeçalho (players.avatar, vem da OpenDota), v2.0.
+        protocol: "https",
+        hostname: "avatars.steamstatic.com",
+      },
     ],
   },
 };

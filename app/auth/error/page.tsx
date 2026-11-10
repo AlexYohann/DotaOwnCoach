@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { HeaderAccountSlot } from "@/components/header-account";
 import { PageShell } from "@/components/page-shell";
 import { StatusMessage } from "@/components/status-message";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ export default function AuthErrorPage({
 }) {
   return (
     <main className="flex-1 flex flex-col">
-      <PageShell>
+      <PageShell account={<HeaderAccountSlot />}>
         <StatusMessage title="Não foi possível entrar">
           {/* cacheComponents: searchParams só dentro de Suspense */}
           <Suspense fallback={<p>{FALLBACK}</p>}>
