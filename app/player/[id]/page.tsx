@@ -22,7 +22,7 @@ import {
   isWin,
 } from "@/lib/match";
 import type { Hero, RecentMatch } from "@/lib/opendota";
-import { mostPlayed, type MostPlayed } from "@/lib/player-summary";
+import { formatDecimal, mostPlayed, type MostPlayed } from "@/lib/player-summary";
 import { toAccountId } from "@/lib/steam";
 import { cn } from "@/lib/utils";
 
@@ -199,19 +199,41 @@ function LastMatch({
 }
 
 function MostPlayedCard({ top, hero }: { top: MostPlayed; hero: Hero | undefined }) {
+  const { avg } = top;
+  const one = (n: number) => formatDecimal(n, 1);
+  const int = (n: number) => formatDecimal(n, 0);
+  // Mockup A (v2.0): grade 3 × 2 com as médias desse herói nas partidas dele.
+  const stats: [string, string][] = [
+    ["K/D/A", `${one(avg.kills)}/${one(avg.deaths)}/${one(avg.assists)}`],
+    ["KDA", one(avg.kda)],
+    ["Vitórias", avg.winRate === null ? "—" : `${Math.round(avg.winRate * 100)}%`],
+    ["GPM", int(avg.gpm)],
+    ["XPM", int(avg.xpm)],
+    ["Last hits", int(avg.lastHits)],
+  ];
   return (
-    <div className="mt-5 inline-flex items-center gap-3 rounded-md border border-line bg-panel/90 px-3 py-2">
-      {hero && (
-        <Image src={hero.img} alt={hero.name} width={56} height={32} className="rounded-sm" />
-      )}
-      <div>
-        <p className={LABEL}>Mais jogado</p>
-        <p className="text-sm font-semibold">{hero?.name ?? `hero_id ${top.heroId}`}</p>
-        <p className="text-xs text-muted-foreground">
-          {top.games} de 20 · <span className="text-win">{top.wins}V</span>{" "}
-          <span className="text-loss">{top.losses}D</span>
-        </p>
+    <div className="mt-5 inline-block rounded-md border border-line bg-panel/90 px-3 py-2">
+      <div className="flex items-center gap-3">
+        {hero && (
+          <Image src={hero.img} alt={hero.name} width={56} height={32} className="rounded-sm" />
+        )}
+        <div>
+          <p className={LABEL}>Mais jogado</p>
+          <p className="text-sm font-semibold">{hero?.name ?? `hero_id ${top.heroId}`}</p>
+          <p className="text-xs text-muted-foreground">
+            {top.games} de 20 · <span className="text-win">{top.wins}V</span>{" "}
+            <span className="text-loss">{top.losses}D</span>
+          </p>
+        </div>
       </div>
+      <dl className="mt-3 grid grid-cols-3 gap-x-5 gap-y-2">
+        {stats.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+            <dd className="text-sm font-semibold tabular-nums text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
