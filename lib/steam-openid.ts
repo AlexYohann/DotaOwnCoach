@@ -11,6 +11,14 @@ const OPENID_NS = "http://specs.openid.net/auth/2.0";
 const IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
 const CLAIMED_ID = /^https:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/;
 const TIMEOUT_MS = 8000;
+const REQUIRED_SIGNED = [
+  "op_endpoint",
+  "claimed_id",
+  "identity",
+  "return_to",
+  "response_nonce",
+  "assoc_handle",
+];
 
 /** Página de login da Steam, que devolve a pessoa para o nosso callback. */
 export function buildSteamLoginUrl(origin: string): string {
@@ -38,6 +46,19 @@ export async function verifySteamResponse(
   fetchFn: typeof fetch = fetch,
 ): Promise<string | null> {
   try {
+    // Cada openid.* uma vez só: com repetição, o que validamos (get = 1ª
+    // ocorrência) podia ser diferente do que a Steam confirmava — bastava pôr
+    // o claimed_id da vítima na frente de uma resposta genuína do atacante.
+    const fields = new Map<string, string>();
+    for (const [k, v] of params) {
+      if (!k.startsWith("openid.")) continue;
+      if (fields.has(k)) return null;
+      fields.set(k, v);
+    }
+    // A assinatura tem que cobrir tudo o que conferimos aqui.
+    const signed = new Set((params.get("openid.signed") ?? "").split(","));
+    if (!REQUIRED_SIGNED.every((f) => signed.has(f))) return null;
+
     if (params.get("openid.mode") !== "id_res") return null;
     if (params.get("openid.op_endpoint") !== STEAM_OPENID_ENDPOINT) return null;
     if (!isOurCallback(params.get("openid.return_to"), origin)) return null;
@@ -46,8 +67,8 @@ export async function verifySteamResponse(
     const match = CLAIMED_ID.exec(claimed);
     if (!match || params.get("openid.identity") !== claimed) return null;
 
-    const body = new URLSearchParams();
-    for (const [k, v] of params) if (k.startsWith("openid.")) body.set(k, v);
+    // Corpo montado dos MESMOS valores validados acima.
+    const body = new URLSearchParams([...fields]);
     body.set("openid.mode", "check_authentication");
 
     const res = await fetchFn(STEAM_OPENID_ENDPOINT, {

@@ -96,6 +96,49 @@ describe("verifySteamResponse", () => {
     );
   });
 
+  // Ataque achado na revisão final: get() lê a 1ª ocorrência, o corpo da
+  // check_authentication levava a última. Vítima na frente, resposta
+  // genuína do atacante atrás → a Steam confirmava a do atacante.
+  it("claimed_id/identity duplicados (vítima + resposta genuína do atacante) recusa", async () => {
+    const VICTIM = "https://steamcommunity.com/openid/id/76561198000000001";
+    const attack = new URLSearchParams();
+    attack.append("openid.claimed_id", VICTIM);
+    attack.append("openid.identity", VICTIM);
+    for (const [k, v] of validParams()) attack.append(k, v);
+    // "Steam" de verdade: só confirma o que ela assinou (o ID do atacante).
+    const fetchFn = vi.fn<typeof fetch>(async (_url, init) => {
+      const body = new URLSearchParams(String(init?.body));
+      return new Response(body.get("openid.claimed_id") === CLAIMED ? VALID : "is_valid:false");
+    });
+    await expect(verifySteamResponse(attack, ORIGIN, fetchFn)).resolves.toBeNull();
+  });
+
+  it.each(["openid.sig", "openid.return_to", "openid.op_endpoint", "openid.signed"])(
+    "qualquer openid.* repetido (%s) recusa sem chamar a Steam",
+    async (key) => {
+      const params = validParams();
+      params.append(key, params.get(key)!);
+      const fetchFn = steamSays(VALID);
+      await expect(verifySteamResponse(params, ORIGIN, fetchFn)).resolves.toBeNull();
+      expect(fetchFn).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["claimed_id", "identity", "return_to", "op_endpoint", "response_nonce", "assoc_handle"])(
+    "openid.signed sem %s recusa sem chamar a Steam",
+    async (field) => {
+      const signed = "signed,op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle"
+        .split(",")
+        .filter((f) => f !== field)
+        .join(",");
+      const fetchFn = steamSays(VALID);
+      await expect(
+        verifySteamResponse(validParams({ "openid.signed": signed }), ORIGIN, fetchFn),
+      ).resolves.toBeNull();
+      expect(fetchFn).not.toHaveBeenCalled();
+    },
+  );
+
   it("Steam responde is_valid:false recusa", async () => {
     const fetchFn = steamSays("ns:http://specs.openid.net/auth/2.0\nis_valid:false\n");
     await expect(verifySteamResponse(validParams(), ORIGIN, fetchFn)).resolves.toBeNull();
