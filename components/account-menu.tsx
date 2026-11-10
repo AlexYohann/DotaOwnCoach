@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,12 +15,13 @@ import { createClient } from "@/lib/supabase/client";
 
 /** Avatar + nome no canto do cabeçalho, com o menu da conta. */
 export function AccountMenu({ account }: { account: HeaderAccount }) {
-  const router = useRouter();
-
+  // Navegação completa, não router.push: o cache do Next guardou páginas do
+  // estado logado (inclusive o redirect "/" → /player/<id> pré-carregado pelo
+  // link da marca), e o push("/") voltava para as partidas. Recarregar a
+  // página descarta esse cache inteiro.
   async function logout() {
     await createClient().auth.signOut();
-    router.push("/");
-    router.refresh();
+    window.location.assign("/");
   }
 
   return (
