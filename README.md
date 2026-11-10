@@ -34,6 +34,7 @@ Cada versão tem uma tag git (`vX.Y.Z`) e uma entrada no [CHANGELOG](CHANGELOG.m
 | **v1.3.1** | Páginas mais rápidas (gravações no banco não seguram mais a resposta) e testes automatizados com Vitest. |
 | **v1.5.0** | Primeiro deploy: https://dota-own-coach.vercel.app (Vercel, funções em São Paulo junto do banco). |
 | **v1.4.0** | Visual novo, só escuro: heróis animados oficiais da Valve, home estilo capa com link para o código de amigo da Steam, página do jogador com a última partida em destaque e o herói mais jogado, tela da partida com o herói selecionado ao fundo, cosméticos, times em dois modos (completo / lado a lado) e ordenação por coluna. |
+| **v2.0.0** | Entrar com a Steam (sem e-mail nem senha): logado, a capa leva direto às suas partidas. Cabeçalho com seu avatar e menu (Minhas partidas, Sair) e busca por ID em todas as páginas. Cartão do herói mais jogado com médias (K/D/A, KDA, % de vitórias, GPM, XPM, last hits). |
 
 As versões 1.1 e 1.2 foram além do plano original da v1 (a tela da partida estava prevista só para depois). Por isso o roteiro abaixo foi **renumerado a partir da v1.3**.
 
@@ -63,13 +64,22 @@ Cada etapa tem um critério de pronto, para dar para saber quando ela acabou de 
   - No Supabase, colocar a URL da Vercel em Authentication → URL Configuration.
   - Pronto quando: o site funciona na URL `.vercel.app`.
 
-### v2: login e diário
+### v2: login, pro players e diário
 
-- Login (o template já tem) e tabela `profiles` ligando o usuário ao `account_id`.
-- Tabela `match_notes`, com uma nota por partida: o que errou, o que fez bem e tags.
-- RLS privado: cada usuário só lê e edita as próprias notas.
-- Página "Minhas partidas", com as notas ao lado de cada partida.
-- **Pronto quando:** com duas contas, nenhuma enxerga as notas da outra. Esse teste é obrigatório.
+Dividida em 2026-11-10 (decisão do Alex): o login virou a parte arriscada e não depende do diário.
+
+- [x] **v2.0: login com a Steam.** Design: `docs/superpowers/specs/2026-11-10-v2-0-login-steam-design.md`.
+  - Só pela Steam (OpenID 2.0, validado no servidor). A Steam prova que a conta é sua, o que a v5 precisa ("ninguém comenta a própria partida"). Sem e-mail nem senha: cadastro e provedor de e-mail desligados no Supabase.
+  - Tabela `profiles` (usuário do site ↔ conta Steam): cada um lê só a própria linha; só o servidor grava.
+  - Logado, a capa leva às suas partidas; cabeçalho com perfil, menu e busca por ID; cartão do herói mais jogado com médias.
+  - Pronto quando: você entra com a Steam e cai nas suas partidas, e uma resposta forjada da Steam é recusada (testes automáticos).
+- **v2.1: pro players.** Busca de pro players pelo nome (lista `/proPlayers` da OpenDota, ~5.700 nomes) na mesma caixa de busca do cabeçalho, e página com os times em destaque (logo + elenco atual), escolhidos pela avaliação da OpenDota entre os que jogaram nos últimos 60 dias. O visual da página ainda vai ser trabalhado.
+- **v2.2: diário.**
+  - Tabela `match_notes`, com uma nota por partida: o que errou, o que fez bem e tags.
+  - RLS privado: cada usuário só lê e edita as próprias notas.
+  - Notas ao lado de cada partida em "Minhas partidas".
+  - **Pronto quando:** com duas contas, nenhuma enxerga as notas da outra. Esse teste é obrigatório.
+- **Depois: idioma.** Seletor português/inglês no cabeçalho. Fica para depois do diário porque mexe em todos os textos do site.
 
 ### v3: metas e evolução
 
@@ -106,6 +116,8 @@ Quem quiser deixa uma partida pública para outros jogadores avaliarem o que err
 
 ### Ideias futuras (sem versão)
 
+- **Histórico além das últimas 20 partidas, ou por herói.** Pedido do Alex (2026-11-10). O banco já acumula as partidas a cada visita (`player_matches` nunca é apagada; o limite de 20 é só na leitura), e a OpenDota tem o histórico inteiro do jogador. Liga direto com a v3.
+
 - **Herói animado com os cosméticos que o jogador usava na partida.** Pedido do Alex (2026-11-07). Hoje não existe: as animações oficiais da Valve (`.webm` no CDN da Steam) mostram só o visual padrão do herói. A lista de cosméticos existia na OpenDota (`players[].cosmetics`), mas **no patch 60 ela vem vazia até em partidas processadas e profissionais** (conferido em 2026-11-08; no patch 56, jan/2025, vinha). Sem fonte de dados atual, esta ideia depende de achar outra (STRATZ? replay próprio?).
   - **O que exigiria:** os modelos 3D do herói e dos itens (arquivos do jogo, formato do Source 2), convertidos para um formato web (glTF), um renderizador 3D no navegador (ex.: three.js) e as animações do herói. Antes de começar, conferir se a Valve permite exibir esses arquivos num projeto de fã: redistribuir arquivos do jogo é diferente de linkar imagens do CDN.
   - **Passo intermediário (entra na v1.4):** mostrar os ícones e nomes dos cosméticos no painel do herói.
@@ -115,7 +127,7 @@ Quem quiser deixa uma partida pública para outros jogadores avaliarem o que err
 ## Stack
 
 - [Next.js 16](https://nextjs.org) (App Router, `cacheComponents`), React 19 e TypeScript
-- [Supabase](https://supabase.com) (auth via cookies com `@supabase/ssr`; tabelas de cache com RLS desde a v1.3)
+- [Supabase](https://supabase.com) (sessão via cookies com `@supabase/ssr`, aberta pelo servidor depois do login com a Steam; tabelas com RLS desde a v1.3)
 - Tailwind CSS v3 + [shadcn/ui](https://ui.shadcn.com)
 - [OpenDota API](https://docs.opendota.com/) (plano gratuito; chamadas só no servidor)
 

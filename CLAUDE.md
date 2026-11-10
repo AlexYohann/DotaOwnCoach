@@ -8,18 +8,17 @@ Scaffolded from the official Next.js + Supabase starter (`create-next-app --exam
 
 Dota features so far (v1.4 visual: design in `docs/superpowers/specs/2026-11-08-v1-4-visual-design.md`):
 - `/` — cover with a random animated hero (`components/home-hero.tsx`, client-side pick so the page stays static) + Steam ID form with the Steam friend-code link (`components/steam-id-form.tsx`).
-- `/player/[id]` — last match highlighted (hero animation, result · side · K/D/A), most-played card (`lib/player-summary.ts`), match table with side column; validates the ID with `toAccountId` (`lib/steam.ts`).
+- `/player/[id]` — last match highlighted (hero animation, result · side · K/D/A), most-played card with that hero's averages (`mostPlayed().avg`, `formatDecimal` pt-BR in `lib/player-summary.ts`), match table with side column; validates the ID with `toAccountId` (`lib/steam.ts`).
+- Every page's header (`SiteHeader`): ID search (`components/header-search.tsx`, only navigates) + account slot ("Entrar com a Steam" or avatar menu). See Auth architecture.
 - `/match/[id]?player=` — selected hero animated in the header, stats panel, cosmetics, team tables in two modes (full / compact, saved in `localStorage` `dota-own-coach:team-mode`) sortable per team (`lib/team-sort.ts`) (`components/match-view.tsx`, `team-tables.tsx`, `match-items.tsx`, client).
 - Shared visual pieces: `HeroBanner` (illustration + hero animation + content, never overlapping) and `HeroRender` (webm with fade-in; always animates — even with prefers-reduced-motion, Alex decided 2026-11-08 — with a pause/play button in `HeroBanner` saved in `localStorage` `dota-own-coach:hero-motion`; saveData/404/unknown hero → static image) in `components/`; Valve CDN URLs and rarity colors in `lib/hero-art.ts`. Dark theme only (no `next-themes`); palette as Tailwind colors `panel`, `line`, `ink`, `ember`, `win`, `loss`, `side` + `font-display` (Barlow Condensed). Side (Radiant/Dire) is always neutral text — never win/loss colors.
 - `lib/opendota.ts` (`server-only`) is the only place that calls OpenDota; it does no caching except the items list (`fetchItems`, `"use cache"` 1 day).
 - `lib/data.ts` (`server-only`) is what pages call: Supabase-first cache (v1.3). Player + recent matches 10 min, heroes 1 day, match `detail` forever (bump `DETAIL_VERSION` if its JSON shape changes). DB errors fall back to API-only; API down with saved data → `freshness.source = "stale"`.
-- Supabase tables (`supabase/migrations/`): `heroes`, `players`, `matches`, `player_matches` — RLS with public SELECT only, no write policies. Reads use `createReadClient()` (publishable key), writes `createAdminClient()` (`SUPABASE_SECRET_KEY`, returns `null` if unset → no writes). Both in `lib/supabase/admin.ts`.
+- Supabase tables (`supabase/migrations/`): `heroes`, `players`, `matches`, `player_matches` — RLS with public SELECT only, no write policies; `profiles` (v2.0) — SELECT own row only, no write policies. Reads use `createReadClient()` (publishable key), writes `createAdminClient()` (`SUPABASE_SECRET_KEY`, returns `null` if unset → no writes). Both in `lib/supabase/admin.ts`.
 
 **`"use cache"` gotcha:** an error thrown inside a cached function reaches the caller as a generic `Error` (it goes through React serialization), so `instanceof OpenDotaError` / `.kind` break. Return a status object and call `cacheLife` conditionally instead, or catch everything at the wrapper (as `getItems` does).
 
 **Layout gotcha:** inside an `overflow-x-auto` wrapper, give the wrapper `relative` — absolutely positioned `sr-only` labels otherwise escape it and widen the whole page on mobile.
-
-Template leftovers still present: auth pages, `/protected`, and tutorial pieces (`components/tutorial/`, `hero.tsx`, `deploy-button.tsx`, `env-var-warning.tsx`, `hasEnvVars`) — meant to be removed.
 
 ## Regras do projeto
 
@@ -76,6 +75,17 @@ Rules carried over from the template (breaking them causes random logouts):
 - In `updateSession`, nothing may run between `createServerClient(...)` and `supabase.auth.getClaims()`, and the returned `supabaseResponse` must be returned as-is (or its cookies copied onto any new response).
 - Use `auth.getClaims()` to check the user server-side (not `getSession()`).
 
-**Route protection is global, not per-page:** `updateSession` redirects any unauthenticated request to `/auth/login` unless the path is `/` or starts with `/login`, `/auth`, `/player` or `/match` (the last two are public while the app has no login). A new public route must be added to that allowlist in `lib/supabase/proxy.ts`. Pages still re-check with `getClaims()` and `redirect()` as defense in depth (see `app/protected/page.tsx`).
+**Login is Steam only (v2.0, design in `docs/superpowers/specs/2026-11-10-v2-0-login-steam-design.md`).** Steam is OpenID 2.0, which Supabase Auth doesn't support, so:
+- `app/auth/steam/route.ts` redirects to Steam (`buildSteamLoginUrl`). `app/auth/steam/callback/route.ts` runs `verifySteamResponse` (`lib/steam-openid.ts`: op_endpoint, `return_to` = our origin + path, `claimed_id` = `identity`, plus `check_authentication` with Steam; any doubt → `null`). Then `prepareSteamSession` (`lib/steam-session.ts`, secret key) and `verifyOtp({ type: "email", token_hash })` on the cookie client, then redirects to `/player/<account_id>`. `openid.mode=cancel` → `/`; failures → `/auth/error?reason=steam|session`.
+- `prepareSteamSession`: `createUser` with internal email `<SteamID64>@steam.invalid`, **no password**, `app_metadata: { steam_id64, account_id }` (`email_exists` = returning user), then `generateLink({ type: "magiclink" })` and an upsert into `profiles`. **`account_id` lives only in `app_metadata`** (server-only); never read it from `user_metadata`, which the user can edit. It reaches the JWT, so `accountIdFromClaims(claims)` (`lib/auth-routing.ts`) gives it without a DB query.
+- Steam already rejects a replayed response (2nd `check_authentication` → `is_valid:false`, checked 2026-11-10), so there is no nonce table.
+- Supabase dashboard (set by Alex): "Allow new users to sign up" **off** and the Email provider **off**. The admin API still creates users; public `signUp`/`signInWithPassword`/`signInWithOtp` fail. Don't turn the Email provider back on.
+- `profiles` (`id` → `auth.users`, `account_id`, `steam_id64`): RLS lets a user SELECT only their own row; no write policies.
+- Header: `HeaderAccountSlot` (`components/header-account.tsx`, server, in `Suspense`) uses `getHeaderAccount()` (`lib/account.ts`): claims → `account_id` → name/avatar from `players`. It **never calls OpenDota**. `SiteHeader`/`PageShell` require an `account` prop so no page forgets it. Logout (`components/account-menu.tsx`) does `signOut()` + `window.location.assign("/")`. A full reload is needed because `router.push("/")` reused the logged-in redirect cached by the brand link's prefetch.
+- Links to `/auth/steam` are plain `<a>`, not `<Link>`, so there is no prefetch of an external redirect.
 
-Auth flow: forms in `components/*-form.tsx` call the browser client directly; email confirmation / password-reset links hit `app/auth/confirm/route.ts`, which calls `verifyOtp` and redirects to `?next=` (default `/`) or `/auth/error`.
+**Route protection is global, not per-page:** `routeFor()` in `lib/auth-routing.ts` (pure, tested) is called by `updateSession`. Rules:
+- logged in with `account_id` on `/` → `/player/<account_id>`;
+- logged out outside the public routes → `/`.
+
+Public routes are `/` plus the prefixes `/auth`, `/player` and `/match`, matched per segment (`/players-x` is not public). A new public route goes in `PUBLIC_PREFIXES`. Redirects copy the `supabaseResponse` cookies.
