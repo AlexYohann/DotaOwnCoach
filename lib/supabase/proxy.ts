@@ -1,17 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { hasEnvVars } from "../utils";
+import { accountIdFromClaims, routeFor } from "@/lib/auth-routing";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
-
-  // If the env vars are not set, skip proxy check. You can remove this
-  // once you setup the project.
-  if (!hasEnvVars) {
-    return supabaseResponse;
-  }
 
   // With Fluid compute, don't put this client in a global environment
   // variable. Always create a new one on each request.
@@ -45,20 +39,25 @@ export async function updateSession(request: NextRequest) {
   // IMPORTANT: If you remove getClaims() and you use server-side rendering
   // with the Supabase client, your users may be randomly logged out.
   const { data } = await supabase.auth.getClaims();
-  const user = data?.claims;
+  const claims = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth") &&
-    !request.nextUrl.pathname.startsWith("/player") &&
-    !request.nextUrl.pathname.startsWith("/match")
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  // Regras em lib/auth-routing.ts: logado em "/" → próprias partidas;
+  // deslogado fora das rotas públicas → "/".
+  const target = routeFor(
+    request.nextUrl.pathname,
+    !!claims,
+    accountIdFromClaims(claims),
+  );
+  if (target) {
     const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
+    url.pathname = target;
+    url.search = "";
+    const redirect = NextResponse.redirect(url);
+    // Mantém os cookies de sessão que o getClaims() possa ter renovado.
+    for (const cookie of supabaseResponse.cookies.getAll()) {
+      redirect.cookies.set(cookie);
+    }
+    return redirect;
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
