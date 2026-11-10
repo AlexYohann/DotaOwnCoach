@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
 
 // Login com a Steam = OpenID 2.0 (o Supabase Auth não tem Steam entre os
 // provedores). Este arquivo só decide se uma resposta da Steam é verdadeira;
@@ -20,12 +21,23 @@ const REQUIRED_SIGNED = [
   "assoc_handle",
 ];
 
-/** Página de login da Steam, que devolve a pessoa para o nosso callback. */
-export function buildSteamLoginUrl(origin: string): string {
+/** Cookie com o valor aleatório que liga o callback a quem começou o login. */
+export const STEAM_STATE_COOKIE = "steam_login_state";
+const MIN_STATE_LENGTH = 16;
+
+export function newLoginState(): string {
+  return randomBytes(24).toString("base64url");
+}
+
+/**
+ * Página de login da Steam, que devolve a pessoa para o nosso callback.
+ * `state` vai dentro do return_to, que a Steam assina: ninguém troca.
+ */
+export function buildSteamLoginUrl(origin: string, state: string): string {
   const p = new URLSearchParams({
     "openid.ns": OPENID_NS,
     "openid.mode": "checkid_setup",
-    "openid.return_to": origin + STEAM_CALLBACK_PATH,
+    "openid.return_to": `${origin}${STEAM_CALLBACK_PATH}?state=${encodeURIComponent(state)}`,
     "openid.realm": origin,
     "openid.identity": IDENTIFIER_SELECT,
     "openid.claimed_id": IDENTIFIER_SELECT,
@@ -43,6 +55,7 @@ export function buildSteamLoginUrl(origin: string): string {
 export async function verifySteamResponse(
   params: URLSearchParams,
   origin: string,
+  expectedState: string, // valor do cookie STEAM_STATE_COOKIE ("" se não houver)
   fetchFn: typeof fetch = fetch,
 ): Promise<string | null> {
   try {
@@ -61,7 +74,7 @@ export async function verifySteamResponse(
 
     if (params.get("openid.mode") !== "id_res") return null;
     if (params.get("openid.op_endpoint") !== STEAM_OPENID_ENDPOINT) return null;
-    if (!isOurCallback(params.get("openid.return_to"), origin)) return null;
+    if (!isOurCallback(params.get("openid.return_to"), origin, expectedState)) return null;
 
     const claimed = params.get("openid.claimed_id") ?? "";
     const match = CLAIMED_ID.exec(claimed);
@@ -85,12 +98,22 @@ export async function verifySteamResponse(
   }
 }
 
-// Mesma origem e mesmo caminho do nosso callback (query string não importa).
-function isOurCallback(returnTo: string | null, origin: string): boolean {
-  if (!returnTo) return false;
+// Mesma origem e caminho do nosso callback, e o state de quem começou o login
+// (login CSRF: sem isso, um link com a resposta de OUTRA pessoa logaria você
+// na conta dela). Outros parâmetros na query não importam.
+function isOurCallback(
+  returnTo: string | null,
+  origin: string,
+  expectedState: string,
+): boolean {
+  if (!returnTo || expectedState.length < MIN_STATE_LENGTH) return false;
   try {
     const url = new URL(returnTo);
-    return url.origin === origin && url.pathname === STEAM_CALLBACK_PATH;
+    return (
+      url.origin === origin &&
+      url.pathname === STEAM_CALLBACK_PATH &&
+      url.searchParams.get("state") === expectedState
+    );
   } catch {
     return false;
   }

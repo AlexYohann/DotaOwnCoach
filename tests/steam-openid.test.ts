@@ -7,6 +7,8 @@ import {
 } from "@/lib/steam-openid";
 
 const ORIGIN = "http://localhost:3000";
+const STATE = "estado-aleatorio-0123456789abcdef";
+const RETURN_TO = ORIGIN + STEAM_CALLBACK_PATH + "?state=" + STATE;
 const STEAM_ID = "76561198065514372";
 const CLAIMED = `https://steamcommunity.com/openid/id/${STEAM_ID}`;
 
@@ -18,7 +20,7 @@ function validParams(overrides: Record<string, string | null> = {}) {
     "openid.op_endpoint": STEAM_OPENID_ENDPOINT,
     "openid.claimed_id": CLAIMED,
     "openid.identity": CLAIMED,
-    "openid.return_to": ORIGIN + STEAM_CALLBACK_PATH,
+    "openid.return_to": RETURN_TO,
     "openid.response_nonce": "2026-11-10T18:27:23Zabc",
     "openid.assoc_handle": "1234567890",
     "openid.signed":
@@ -39,12 +41,12 @@ const VALID = "ns:http://specs.openid.net/auth/2.0\nis_valid:true\n";
 
 describe("buildSteamLoginUrl", () => {
   it("monta checkid_setup com return_to e realm da origem", () => {
-    const url = buildSteamLoginUrl(ORIGIN);
+    const url = buildSteamLoginUrl(ORIGIN, STATE);
     expect(url.startsWith(STEAM_OPENID_ENDPOINT + "?")).toBe(true);
     const p = new URL(url).searchParams;
     expect(p.get("openid.mode")).toBe("checkid_setup");
     expect(p.get("openid.ns")).toBe("http://specs.openid.net/auth/2.0");
-    expect(p.get("openid.return_to")).toBe(ORIGIN + STEAM_CALLBACK_PATH);
+    expect(p.get("openid.return_to")).toBe(RETURN_TO);
     expect(p.get("openid.realm")).toBe(ORIGIN);
     const select = "http://specs.openid.net/auth/2.0/identifier_select";
     expect(p.get("openid.identity")).toBe(select);
@@ -56,7 +58,7 @@ describe("verifySteamResponse", () => {
   it("resposta válida e confirmada pela Steam devolve o SteamID64", async () => {
     const fetchFn = steamSays(VALID);
 
-    await expect(verifySteamResponse(validParams(), ORIGIN, fetchFn)).resolves.toBe(
+    await expect(verifySteamResponse(validParams(), ORIGIN, STATE, fetchFn)).resolves.toBe(
       STEAM_ID,
     );
 
@@ -82,16 +84,16 @@ describe("verifySteamResponse", () => {
   ])("recusa localmente (%s) sem chamar a Steam", async (_, overrides) => {
     const fetchFn = steamSays(VALID);
     await expect(
-      verifySteamResponse(validParams(overrides), ORIGIN, fetchFn),
+      verifySteamResponse(validParams(overrides), ORIGIN, STATE, fetchFn),
     ).resolves.toBeNull();
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it("return_to com query string no mesmo caminho é aceito", async () => {
     const params = validParams({
-      "openid.return_to": ORIGIN + STEAM_CALLBACK_PATH + "?x=1",
+      "openid.return_to": RETURN_TO + "&x=1",
     });
-    await expect(verifySteamResponse(params, ORIGIN, steamSays(VALID))).resolves.toBe(
+    await expect(verifySteamResponse(params, ORIGIN, STATE, steamSays(VALID))).resolves.toBe(
       STEAM_ID,
     );
   });
@@ -110,7 +112,7 @@ describe("verifySteamResponse", () => {
       const body = new URLSearchParams(String(init?.body));
       return new Response(body.get("openid.claimed_id") === CLAIMED ? VALID : "is_valid:false");
     });
-    await expect(verifySteamResponse(attack, ORIGIN, fetchFn)).resolves.toBeNull();
+    await expect(verifySteamResponse(attack, ORIGIN, STATE, fetchFn)).resolves.toBeNull();
   });
 
   it.each(["openid.sig", "openid.return_to", "openid.op_endpoint", "openid.signed"])(
@@ -119,7 +121,7 @@ describe("verifySteamResponse", () => {
       const params = validParams();
       params.append(key, params.get(key)!);
       const fetchFn = steamSays(VALID);
-      await expect(verifySteamResponse(params, ORIGIN, fetchFn)).resolves.toBeNull();
+      await expect(verifySteamResponse(params, ORIGIN, STATE, fetchFn)).resolves.toBeNull();
       expect(fetchFn).not.toHaveBeenCalled();
     },
   );
@@ -133,26 +135,46 @@ describe("verifySteamResponse", () => {
         .join(",");
       const fetchFn = steamSays(VALID);
       await expect(
-        verifySteamResponse(validParams({ "openid.signed": signed }), ORIGIN, fetchFn),
+        verifySteamResponse(validParams({ "openid.signed": signed }), ORIGIN, STATE, fetchFn),
       ).resolves.toBeNull();
       expect(fetchFn).not.toHaveBeenCalled();
     },
   );
 
+  // Login CSRF (revisão final): a resposta só vale no navegador que começou o
+  // login — o state do cookie tem que estar no return_to (assinado pela Steam).
+  it.each([
+    ["return_to sem state", { "openid.return_to": ORIGIN + STEAM_CALLBACK_PATH }],
+    ["state de outro navegador", { "openid.return_to": ORIGIN + STEAM_CALLBACK_PATH + "?state=outro-estado-0123456789" }],
+  ])("recusa %s sem chamar a Steam", async (_, overrides) => {
+    const fetchFn = steamSays(VALID);
+    await expect(
+      verifySteamResponse(validParams(overrides), ORIGIN, STATE, fetchFn),
+    ).resolves.toBeNull();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("sem cookie de state (esperado vazio) recusa mesmo com return_to sem state", async () => {
+    const fetchFn = steamSays(VALID);
+    const params = validParams({ "openid.return_to": ORIGIN + STEAM_CALLBACK_PATH + "?state=" });
+    await expect(verifySteamResponse(params, ORIGIN, "", fetchFn)).resolves.toBeNull();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it("Steam responde is_valid:false recusa", async () => {
     const fetchFn = steamSays("ns:http://specs.openid.net/auth/2.0\nis_valid:false\n");
-    await expect(verifySteamResponse(validParams(), ORIGIN, fetchFn)).resolves.toBeNull();
+    await expect(verifySteamResponse(validParams(), ORIGIN, STATE, fetchFn)).resolves.toBeNull();
   });
 
   it("resposta da Steam sem is_valid recusa", async () => {
     await expect(
-      verifySteamResponse(validParams(), ORIGIN, steamSays("ok")),
+      verifySteamResponse(validParams(), ORIGIN, STATE, steamSays("ok")),
     ).resolves.toBeNull();
   });
 
   it("HTTP 500 da Steam recusa", async () => {
     await expect(
-      verifySteamResponse(validParams(), ORIGIN, steamSays(VALID, 500)),
+      verifySteamResponse(validParams(), ORIGIN, STATE, steamSays(VALID, 500)),
     ).resolves.toBeNull();
   });
 
@@ -160,6 +182,6 @@ describe("verifySteamResponse", () => {
     const fetchFn = vi
       .fn<typeof fetch>()
       .mockRejectedValue(new DOMException("timeout", "TimeoutError"));
-    await expect(verifySteamResponse(validParams(), ORIGIN, fetchFn)).resolves.toBeNull();
+    await expect(verifySteamResponse(validParams(), ORIGIN, STATE, fetchFn)).resolves.toBeNull();
   });
 });
