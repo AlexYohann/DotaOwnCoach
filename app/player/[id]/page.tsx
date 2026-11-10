@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
+import { HeaderAccountSlot } from "@/components/header-account";
 import { HeroBanner } from "@/components/hero-banner";
 import { HeroCell } from "@/components/hero-cell";
 import { PageShell } from "@/components/page-shell";
@@ -21,18 +22,16 @@ import {
   isWin,
 } from "@/lib/match";
 import type { Hero, RecentMatch } from "@/lib/opendota";
-import { mostPlayed, type MostPlayed } from "@/lib/player-summary";
+import { formatDecimal, mostPlayed, type MostPlayed } from "@/lib/player-summary";
 import { toAccountId } from "@/lib/steam";
 import { cn } from "@/lib/utils";
 
 const PUBLIC_DATA_TIP =
   'No Dota 2: Configurações → Opções → Social → ative "Expor dados públicos de partidas". Depois disso, pode levar um tempo até a OpenDota ver suas partidas novas.';
 
-const NEW_SEARCH = (
-  <Link href="/" className="hover:text-ink">
-    Buscar outro ID
-  </Link>
-);
+// Canto do cabeçalho (Entrar com a Steam / menu da conta). A busca por outro
+// ID agora fica no próprio cabeçalho, em todas as páginas.
+const ACCOUNT = <HeaderAccountSlot />;
 
 export default function PlayerPage({
   params,
@@ -44,7 +43,7 @@ export default function PlayerPage({
       {/* cacheComponents: dados de request (params, fetch) ficam dentro de Suspense */}
       <Suspense
         fallback={
-          <PageShell right={NEW_SEARCH}>
+          <PageShell account={ACCOUNT}>
             <p className="text-muted-foreground">Buscando partidas na OpenDota…</p>
           </PageShell>
         }
@@ -66,7 +65,7 @@ async function PlayerContent({
 
   if (accountId === null) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <StatusMessage title="ID inválido">
           <p>
             &quot;{rawId}&quot; não é um Steam ID válido. Use o código de amigo
@@ -88,7 +87,7 @@ async function PlayerContent({
     ]);
   } catch (err) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <OpenDotaErrorMessage error={err} />
       </PageShell>
     );
@@ -96,7 +95,7 @@ async function PlayerContent({
 
   if (!player) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <StatusMessage title="Jogador não encontrado">
           <p>
             A OpenDota não conhece a conta {accountId}. Confira o ID. Se estiver
@@ -113,7 +112,7 @@ async function PlayerContent({
 
   if (matches.length === 0) {
     return (
-      <PageShell right={NEW_SEARCH}>
+      <PageShell account={ACCOUNT}>
         <StatusMessage title={`${name}: nenhuma partida encontrada`}>
           <p>
             O jogador não tem partidas registradas ou o perfil está privado.
@@ -135,7 +134,7 @@ async function PlayerContent({
         heroKey={heroKey(lastHero?.img)}
         poster={lastHero?.img ?? null}
         alt={lastHero?.name ?? ""}
-        nav={<SiteHeader right={NEW_SEARCH} />}
+        nav={<SiteHeader account={ACCOUNT} />}
       >
         <h1 className="font-display text-4xl font-bold uppercase leading-none">
           {name}
@@ -200,19 +199,41 @@ function LastMatch({
 }
 
 function MostPlayedCard({ top, hero }: { top: MostPlayed; hero: Hero | undefined }) {
+  const { avg } = top;
+  const one = (n: number) => formatDecimal(n, 1);
+  const int = (n: number) => formatDecimal(n, 0);
+  // Mockup A (v2.0): grade 3 × 2 com as médias desse herói nas partidas dele.
+  const stats: [string, string][] = [
+    ["K/D/A", `${one(avg.kills)}/${one(avg.deaths)}/${one(avg.assists)}`],
+    ["KDA", one(avg.kda)],
+    ["Vitórias", avg.winRate === null ? "—" : `${Math.round(avg.winRate * 100)}%`],
+    ["GPM", int(avg.gpm)],
+    ["XPM", int(avg.xpm)],
+    ["Last hits", int(avg.lastHits)],
+  ];
   return (
-    <div className="mt-5 inline-flex items-center gap-3 rounded-md border border-line bg-panel/90 px-3 py-2">
-      {hero && (
-        <Image src={hero.img} alt={hero.name} width={56} height={32} className="rounded-sm" />
-      )}
-      <div>
-        <p className={LABEL}>Mais jogado</p>
-        <p className="text-sm font-semibold">{hero?.name ?? `hero_id ${top.heroId}`}</p>
-        <p className="text-xs text-muted-foreground">
-          {top.games} de 20 · <span className="text-win">{top.wins}V</span>{" "}
-          <span className="text-loss">{top.losses}D</span>
-        </p>
+    <div className="mt-5 inline-block rounded-md border border-line bg-panel/90 px-3 py-2">
+      <div className="flex items-center gap-3">
+        {hero && (
+          <Image src={hero.img} alt={hero.name} width={56} height={32} className="rounded-sm" />
+        )}
+        <div>
+          <p className={LABEL}>Mais jogado</p>
+          <p className="text-sm font-semibold">{hero?.name ?? `hero_id ${top.heroId}`}</p>
+          <p className="text-xs text-muted-foreground">
+            {top.games} de 20 · <span className="text-win">{top.wins}V</span>{" "}
+            <span className="text-loss">{top.losses}D</span>
+          </p>
+        </div>
       </div>
+      <dl className="mt-3 grid grid-cols-3 gap-x-5 gap-y-2">
+        {stats.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+            <dd className="text-sm font-semibold tabular-nums text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

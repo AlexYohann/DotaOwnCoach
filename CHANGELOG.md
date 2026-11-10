@@ -3,6 +3,27 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [2.0.0] — 2026-11-10
+
+### Adicionado
+- **Entrar com a Steam**, sem e-mail nem senha. A Steam confirma quem é você; o site guarda só a ligação entre a sua conta do site e a conta Steam.
+- Logado, abrir o site leva direto às suas partidas.
+- Cabeçalho em todas as páginas: busca por código de amigo ou SteamID64, e seu avatar com menu (Minhas partidas, Sair). Deslogado, botão "Entrar com a Steam".
+- Cartão do herói mais jogado com as médias desse herói nas últimas 20 partidas: K/D/A, KDA, % de vitórias, GPM, XPM e last hits (em qualquer jogador).
+
+### Removido
+- Login por e-mail e senha do template (cadastro, esqueci a senha, confirmação, `/protected`) e as peças de tutorial.
+
+### Técnico
+- Steam é OpenID 2.0 (o Supabase Auth não tem Steam): `lib/steam-openid.ts` valida a resposta (endpoint, `return_to` da nossa origem, `claimed_id` = `identity`, e `check_authentication` com a própria Steam; qualquer dúvida recusa). A Steam já recusa a mesma resposta usada duas vezes (conferido), por isso não há tabela de nonces.
+- Sessão do Supabase aberta pelo servidor (`lib/steam-session.ts`): usuário com e-mail interno `<SteamID64>@steam.invalid` e sem senha, `generateLink` + `verifyOtp`. `account_id` vai em `app_metadata` (só o servidor altera) e chega no JWT (ES256), então proxy e cabeçalho não consultam o banco para saber quem é.
+- No painel do Supabase Auth: cadastro público e provedor de e-mail desligados — `signUp`, `signInWithPassword` e `signInWithOtp` com a chave pública são recusados.
+- Tabela `profiles` (migração `20261110000000_v2_0_profiles.sql`): RLS com leitura só da própria linha; nenhuma política de escrita.
+- Regras de rota em `lib/auth-routing.ts` (testadas): rotas públicas por segmento (`/players-falso` não é público), sem login → `/`.
+- Revisão final de segurança (antes do merge): (1) parâmetro `openid.*` repetido é recusado — com o `claimed_id` da vítima na frente de uma resposta genuína do atacante, a validação lia um e a Steam confirmava o outro, o que permitia entrar como qualquer conta; (2) `state` aleatório num cookie HttpOnly, conferido no `return_to` assinado (login CSRF); (3) origem do login só da lista fixa (produção/preview da Vercel ou localhost), sem confiar no Host do request.
+- "Sair" recarrega a página: o cache de navegação do Next guardava o redirecionamento do estado logado e voltava para as partidas.
+- 174 testes (Vitest). Tempo de `/player/[id]` medido antes e depois em `next start`.
+
 ## [1.5.0] — 2026-11-08
 
 ### Adicionado

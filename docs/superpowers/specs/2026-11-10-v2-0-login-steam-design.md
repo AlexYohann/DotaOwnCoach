@@ -111,6 +111,24 @@ O caminho previsto, ainda **não testado neste projeto**:
 
 Se o caminho não funcionar, o builder escolhe outro e registra o porquê no documento ou no plano. A sessão tem que continuar sendo a do Supabase, para o `auth.uid()` funcionar no RLS da v2.2, e nenhum segredo pode ir ao cliente.
 
+#### Resultado do protótipo (2026-11-10)
+
+O caminho previsto **funcionou**, testado com o login real do Alex na Steam em `localhost` e com scripts usando um SteamID fictício.
+
+| Pergunta | Resultado |
+|---|---|
+| Domínio do e-mail interno | **`steam.invalid`** aceito pelo `createUser` → `STEAM_EMAIL_DOMAIN = "steam.invalid"` |
+| Usuário já existe | `createUser` devolve `error.code === "email_exists"` (status 422). `generateLink` devolve o mesmo `user.id` |
+| `type` do `verifyOtp` | **`"email"`** abre a sessão (`"magiclink"` também funciona, mas está obsoleto). O mesmo `token_hash` de novo → `otp_expired` |
+| Sessão nos cookies | Sim. `verifyOtp` no Route Handler com o cliente de `lib/supabase/server.ts` grava o cookie, e outra rota viu o usuário logado |
+| `account_id` nas claims | Sim. `getClaims().claims.app_metadata = { account_id, steam_id64, provider: "email", providers: ["email"] }`. JWT ES256 |
+| Replay da resposta da Steam | **A Steam recusa sozinha:** 1ª `check_authentication` → `is_valid:true`, 2ª → `is_valid:false`. **Não precisa** de nonce/tabela própria (passo 4 da Task 3 do plano é pulado) |
+| Cadastro desligado | Com "Allow new users to sign up" **desligado**, `signUp` público → `signup_disabled`. `createUser` (admin), `generateLink` e `verifyOtp` continuam funcionando |
+| Provedor Email desligado | Com o provedor Email **desligado**, o fluxo admin continua funcionando. `signInWithOtp` e `signInWithPassword` públicos → `email_provider_disabled`. **Estado final do painel (feito pelo Alex): cadastro desligado + provedor Email desligado.** Nenhum caminho de login por e-mail sobra |
+| Base de tempo (critério 7) | `/player/105248644` em `next start`, dados do banco: mediana **~0,09 s** (2 rodadas de 10: 0,10 s e 0,085 s) |
+
+Observação para a Task 6: o navegador do Alex ainda tinha o cookie do usuário de e-mail apagado, e o proxy logou `Invalid Refresh Token`. Um cookie de usuário que não existe mais tem que valer como **deslogado**, sem quebrar a página.
+
 ### 4. Tabela `profiles`
 
 ```sql
