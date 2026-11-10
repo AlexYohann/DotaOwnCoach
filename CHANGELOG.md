@@ -20,8 +20,9 @@ Cada versão tem uma tag git `vX.Y.Z`.
 - No painel do Supabase Auth: cadastro público e provedor de e-mail desligados — `signUp`, `signInWithPassword` e `signInWithOtp` com a chave pública são recusados.
 - Tabela `profiles` (migração `20261110000000_v2_0_profiles.sql`): RLS com leitura só da própria linha; nenhuma política de escrita.
 - Regras de rota em `lib/auth-routing.ts` (testadas): rotas públicas por segmento (`/players-falso` não é público), sem login → `/`.
+- Revisão final de segurança (antes do merge): (1) parâmetro `openid.*` repetido é recusado — com o `claimed_id` da vítima na frente de uma resposta genuína do atacante, a validação lia um e a Steam confirmava o outro, o que permitia entrar como qualquer conta; (2) `state` aleatório num cookie HttpOnly, conferido no `return_to` assinado (login CSRF); (3) origem do login só da lista fixa (produção/preview da Vercel ou localhost), sem confiar no Host do request.
 - "Sair" recarrega a página: o cache de navegação do Next guardava o redirecionamento do estado logado e voltava para as partidas.
-- 147 testes (Vitest). Tempo de `/player/[id]` medido antes e depois em `next start`.
+- 174 testes (Vitest). Tempo de `/player/[id]` medido antes e depois em `next start`.
 
 ## [1.5.0] — 2026-11-08
 
