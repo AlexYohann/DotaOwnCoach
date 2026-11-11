@@ -75,6 +75,7 @@ Dividida em 2026-11-10 (decisão do Alex): o login virou a parte arriscada e nã
   - Pronto quando: você entra com a Steam e cai nas suas partidas, e uma resposta forjada da Steam é recusada (testes automáticos).
 - **v2.1: pro players.** Busca de pro players pelo nome (lista `/proPlayers` da OpenDota, ~5.700 nomes) na mesma caixa de busca do cabeçalho, e página com os times em destaque (logo + elenco atual), escolhidos pela avaliação da OpenDota entre os que jogaram nos últimos 60 dias. O visual da página ainda vai ser trabalhado.
 - **v2.2: diário.**
+  - **Pré-requisito: backup automático do banco.** As notas são escritas pelos usuários e não existem em nenhum outro lugar. O plano gratuito do Supabase não garante backup: antes de abrir o diário, uma tarefa agendada (GitHub Actions) exporta o banco todo dia (`supabase db dump`) e guarda as últimas cópias fora do Supabase. Alternativa paga: plano Pro (7 dias de backups diários).
   - Tabela `match_notes`, com uma nota por partida: o que errou, o que fez bem e tags.
   - RLS privado: cada usuário só lê e edita as próprias notas.
   - Notas ao lado de cada partida em "Minhas partidas".
@@ -144,3 +145,19 @@ Banco: aplique as migrações de `supabase/migrations/` no seu projeto Supabase 
 Outros comandos: `npm test` (testes com Vitest), `npm run lint`, `npm run build` (build de produção, também checa os tipos) e `npx tsc --noEmit` (só os tipos).
 
 Para ver as próprias partidas, no Dota 2 ative **Configurações → Opções → Social → "Expor dados públicos de partidas"**.
+
+## Como voltar uma versão
+
+Cada versão tem uma tag (`vX.Y.Z`) no GitHub, e todo push na `main` publica na Vercel.
+
+- **Urgente: o deploy novo quebrou o site.** Vercel → projeto `dota-own-coach` → Deployments → no deploy anterior, **Instant Rollback**. Volta em segundos, sem rebuild. No plano gratuito só dá para voltar **um** deploy.
+- **Desfazer uma versão pelo git:** cada versão maior entra na `main` por um commit de merge (`Merge v…`). Revertê-lo cria um commit novo que desfaz a versão inteira, sem apagar histórico; depois, push na `main` e a Vercel publica em 1–2 minutos:
+  ```bash
+  git log --oneline --merges          # acha o hash do "Merge v2.0: …"
+  git revert -m 1 <hash do merge>
+  npm test && git push
+  ```
+  Versões sem merge (correções como v1.4.1) se desfazem com `git revert <hash do commit>`.
+- **Banco de dados:** as migrações de `supabase/migrations/` só adicionam tabelas, então voltar o código não exige mexer no banco. Dados apagados não voltam pelo git: veja o backup (pré-requisito da v2.2).
+- **Configuração fora do código:** o painel do Supabase Auth (cadastro e provedor de e-mail desligados desde a v2.0) e as variáveis de ambiente da Vercel não são versionados. Uma versão anterior à v2.0 não tem login, então não depende deles.
+
