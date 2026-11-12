@@ -6,6 +6,9 @@ vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 import {
   getHeroesFromApi,
   getMatch,
+  getProPlayers,
+  getTeamPlayers,
+  getTeams,
   getPlayer,
   getRecentMatches,
   OpenDotaError,
@@ -205,5 +208,133 @@ describe("getMatch", () => {
   it("partida sem players (ainda não processada) vira null", async () => {
     fetchMock.mockResolvedValue(json({ match_id: 1 }));
     await expect(getMatch(1)).resolves.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v2.1: pro players e times
+
+const rawPro = (over: Record<string, unknown> = {}) => ({
+  account_id: 321580662,
+  name: "Yatoro",
+  personaname: "raddan",
+  avatarmedium: "https://avatars.steamstatic.com/a_medium.jpg",
+  team_id: 7119388,
+  team_name: "Team Spirit",
+  team_tag: "TSpirit",
+  is_locked: true,
+  last_match_time: "2026-11-01T10:00:00.000Z",
+  ...over,
+});
+
+describe("getProPlayers", () => {
+  it("mapeia os campos usados", async () => {
+    fetchMock.mockResolvedValue(json([rawPro()]));
+    await expect(getProPlayers()).resolves.toEqual([
+      {
+        account_id: 321580662,
+        name: "Yatoro",
+        personaname: "raddan",
+        avatar: "https://avatars.steamstatic.com/a_medium.jpg",
+        team_id: 7119388,
+        team_name: "Team Spirit",
+        team_tag: "TSpirit",
+        verified: true,
+        last_match_time: "2026-11-01T10:00:00.000Z",
+      },
+    ]);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.opendota.com/api/proPlayers");
+  });
+
+  it("is_locked nulo não é verificado; time 0 e textos vazios viram null", async () => {
+    fetchMock.mockResolvedValue(
+      json([rawPro({ is_locked: null, team_id: 0, team_name: "", team_tag: "", last_match_time: null })]),
+    );
+    const [p] = await getProPlayers();
+    expect(p.verified).toBe(false);
+    expect(p.team_id).toBeNull();
+    expect(p.team_name).toBeNull();
+    expect(p.team_tag).toBeNull();
+    expect(p.last_match_time).toBeNull();
+  });
+
+  it("pula registros sem account_id válido ou sem nick", async () => {
+    fetchMock.mockResolvedValue(
+      json([
+        rawPro({ account_id: null }),
+        rawPro({ account_id: -5 }),
+        rawPro({ account_id: 1.5 }),
+        rawPro({ account_id: 10, name: null }),
+        rawPro({ account_id: 11, name: "   " }),
+        null,
+        rawPro({ account_id: 12, name: "ok" }),
+      ]),
+    );
+    const out = await getProPlayers();
+    expect(out.map((p) => p.account_id)).toEqual([12]);
+  });
+
+  it("corpo que não é lista lança OpenDotaError unavailable", async () => {
+    fetchMock.mockResolvedValue(json({}));
+    const err = await getProPlayers().catch((e) => e);
+    expect(err).toBeInstanceOf(OpenDotaError);
+    expect(err.kind).toBe("unavailable");
+  });
+
+  it("429 lança rate_limit", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 429 }));
+    const err = await getProPlayers().catch((e) => e);
+    expect(err.kind).toBe("rate_limit");
+  });
+});
+
+describe("getTeams", () => {
+  it("mapeia os campos e pula itens sem id ou rating", async () => {
+    fetchMock.mockResolvedValue(
+      json([
+        { team_id: 7119388, name: "Team Spirit", tag: "TSpirit", logo_url: "https://x/l.png", rating: 1592.4, last_match_time: 1793500000 },
+        { team_id: 2, name: "Sem logo", tag: "", rating: 1400, last_match_time: null },
+        { name: "sem id", rating: 1 },
+        { team_id: 3, name: "sem rating", rating: null },
+      ]),
+    );
+    await expect(getTeams()).resolves.toEqual([
+      { team_id: 7119388, name: "Team Spirit", tag: "TSpirit", logo_url: "https://x/l.png", rating: 1592.4, last_match_time: 1793500000 },
+      { team_id: 2, name: "Sem logo", tag: null, logo_url: null, rating: 1400, last_match_time: null },
+    ]);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.opendota.com/api/teams");
+  });
+
+  it("corpo que não é lista lança unavailable", async () => {
+    fetchMock.mockResolvedValue(json(null));
+    const err = await getTeams().catch((e) => e);
+    expect(err).toBeInstanceOf(OpenDotaError);
+    expect(err.kind).toBe("unavailable");
+  });
+});
+
+describe("getTeamPlayers", () => {
+  it("chama o endereço do time e devolve os membros", async () => {
+    const members = [
+      { account_id: 321580662, name: "Yatoro", games_played: 1354, wins: 900, is_current_team_member: true },
+      { account_id: 5, name: null, games_played: 2, wins: 1, is_current_team_member: null },
+    ];
+    fetchMock.mockResolvedValue(json(members));
+    await expect(getTeamPlayers(7119388)).resolves.toEqual([
+      { account_id: 321580662, name: "Yatoro", games_played: 1354, is_current_team_member: true },
+      { account_id: 5, name: null, games_played: 2, is_current_team_member: null },
+    ]);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.opendota.com/api/teams/7119388/players");
+  });
+
+  it("404 vira lista vazia", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 404 }));
+    await expect(getTeamPlayers(1)).resolves.toEqual([]);
+  });
+
+  it("429 lança rate_limit", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 429 }));
+    const err = await getTeamPlayers(1).catch((e) => e);
+    expect(err.kind).toBe("rate_limit");
   });
 });

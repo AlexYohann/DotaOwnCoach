@@ -101,13 +101,13 @@ export class OpenDotaError extends Error {
 }
 
 /** Devolve o JSON, ou null em 404. Lança OpenDotaError nos demais problemas. */
-async function request<T>(path: string): Promise<T | null> {
+async function request<T>(path: string, timeoutMs = TIMEOUT_MS): Promise<T | null> {
   // Uma linha por chamada REAL à API: é assim que se confere o cache (v1.3).
   console.info(`[OpenDota] GET ${path}`);
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     // Erro de rede ou timeout.
@@ -285,4 +285,111 @@ export async function getMatch(matchId: number): Promise<MatchDetail | null> {
   const data = await request<RawMatch>(`/matches/${matchId}`);
   if (!data || !Array.isArray(data.players)) return null;
   return toMatchDetail(data, data.players);
+}
+
+// ---------------------------------------------------------------------------
+// v2.1: pro players e times. Sem cache aqui: quem guarda é o banco
+// (lib/pros-data.ts), renovado uma vez por dia.
+
+// /proPlayers (~5.700 registros) e /teams (1.000) são respostas grandes.
+const LIST_TIMEOUT_MS = 20000;
+
+export type ProPlayer = {
+  account_id: number;
+  name: string; // nick de pro
+  personaname: string | null; // nome atual na Steam
+  avatar: string | null;
+  team_id: number | null;
+  team_name: string | null;
+  team_tag: string | null;
+  verified: boolean; // "is_locked": conta confirmada pela OpenDota
+  last_match_time: string | null; // ISO
+};
+
+export type ProTeam = {
+  team_id: number;
+  name: string;
+  tag: string | null;
+  logo_url: string | null;
+  rating: number; // Elo: começa em 1000
+  last_match_time: number | null; // segundos Unix
+};
+
+export type TeamMember = {
+  account_id: number;
+  name: string | null;
+  games_played: number;
+  is_current_team_member: boolean | null;
+};
+
+const text = (v: unknown): string | null =>
+  typeof v === "string" && v.trim() ? v.trim() : null;
+const positiveInt = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v > 0;
+
+async function requestList(path: string): Promise<Record<string, unknown>[]> {
+  const data = await request<unknown>(path, LIST_TIMEOUT_MS);
+  if (!Array.isArray(data)) {
+    throw new OpenDotaError("unavailable", `${path} não devolveu uma lista`);
+  }
+  // Itens que não são objeto (null, número) são lixo: ignora.
+  return data.filter((x) => x !== null && typeof x === "object");
+}
+
+/** Todos os jogadores da lista de pros. Registros sem ID ou sem nick são pulados. */
+export async function getProPlayers(): Promise<ProPlayer[]> {
+  const list = await requestList("/proPlayers");
+  const out: ProPlayer[] = [];
+  for (const p of list) {
+    const name = text(p.name);
+    if (!positiveInt(p.account_id) || !name) continue;
+    out.push({
+      account_id: p.account_id,
+      name,
+      personaname: text(p.personaname),
+      avatar: text(p.avatarmedium),
+      team_id: positiveInt(p.team_id) ? p.team_id : null,
+      team_name: text(p.team_name),
+      team_tag: text(p.team_tag),
+      verified: p.is_locked === true,
+      last_match_time: text(p.last_match_time),
+    });
+  }
+  return out;
+}
+
+/** Os times da OpenDota (vêm ordenados por rating). */
+export async function getTeams(): Promise<ProTeam[]> {
+  const list = await requestList("/teams");
+  const out: ProTeam[] = [];
+  for (const t of list) {
+    if (!positiveInt(t.team_id) || typeof t.rating !== "number") continue;
+    out.push({
+      team_id: t.team_id,
+      name: text(t.name) ?? `Time ${t.team_id}`,
+      tag: text(t.tag),
+      logo_url: text(t.logo_url),
+      rating: t.rating,
+      last_match_time: typeof t.last_match_time === "number" ? t.last_match_time : null,
+    });
+  }
+  return out;
+}
+
+/** Todos que já jogaram pelo time; quem filtra o elenco atual é lib/pros.ts. */
+export async function getTeamPlayers(teamId: number): Promise<TeamMember[]> {
+  const data = await request<unknown>(`/teams/${teamId}/players`);
+  if (!Array.isArray(data)) return []; // 404 ou corpo estranho: sem elenco
+  const out: TeamMember[] = [];
+  for (const m of data as Record<string, unknown>[]) {
+    if (!m || !positiveInt(m.account_id)) continue;
+    out.push({
+      account_id: m.account_id,
+      name: text(m.name),
+      games_played: typeof m.games_played === "number" ? m.games_played : 0,
+      is_current_team_member:
+        typeof m.is_current_team_member === "boolean" ? m.is_current_team_member : null,
+    });
+  }
+  return out;
 }
