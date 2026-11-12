@@ -275,11 +275,15 @@ async function isStale(admin: Admin): Promise<boolean> {
  * Lança OpenDotaError se não há nada salvo e não deu para buscar.
  */
 export async function getFeaturedTeams(): Promise<FeaturedTeam[]> {
-  const saved = await readFeatured();
   const admin = createAdminClient();
+  // As duas leituras saem juntas: a página não espera uma depois da outra.
+  const [saved, stale] = await Promise.all([
+    readFeatured(),
+    admin ? isStale(admin) : false,
+  ]);
 
   if (saved && saved.length > 0) {
-    if (admin && (await isStale(admin))) {
+    if (admin && stale) {
       after(() =>
         refreshPros().then(
           () => {},

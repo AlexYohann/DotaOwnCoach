@@ -3,6 +3,28 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [2.1.0] — 2026-11-12
+
+### Adicionado
+- **Busca de pro players pelo nick**, na caixa do cabeçalho de todas as páginas. Tolera erro de digitação ("yatorro" acha o Yatoro). As sugestões vêm em dois grupos: "Profissionais verificados" (com selo, time e brasão) e "Outros jogadores com esse nome" — existem vários "Yatoro", só um é o da Team Spirit. Número + Enter continua sendo busca por ID.
+- **Página Pro players** (`/pros`): busca grande e os 6 times mais bem colocados que jogaram nos últimos 60 dias, cada um com o elenco atual inteiro. Clicar num jogador abre as partidas dele. Um "?" explica o que é o rating.
+- **Capa:** "Ver um exemplo" (abre as partidas de um profissional sorteado) e "Partidas dos pro players", para quem chega sem o próprio ID.
+- **Tela da partida:** dica "Clique num herói…", que some de vez quando dispensada.
+- **Página do jogador:** link "Perfil na Steam ↗" para qualquer jogador e, se for um profissional verificado, a linha "Pro: nick ✓ · time" (o nome da Steam quase nunca é o nick).
+- **Menu do avatar:** código de amigo com botão de copiar, "Meu perfil na Steam", "Pro players" e liga/desliga da animação dos heróis.
+
+### Alterado
+- "Sair" encerra a sessão só neste aparelho (antes desconectava todos os navegadores da conta).
+- A caixa de busca do cabeçalho aceita texto (antes só número) e ficou um pouco mais larga.
+
+### Técnico
+- Tabelas `pro_teams`, `pro_players` e `pros_refresh` (migração `20261112000000_v2_1_pros.sql`): RLS com leitura pública nas duas primeiras e nenhuma política na terceira (só o servidor); nenhuma política de escrita. Busca pela função SQL `search_pros` (`pg_trgm`), 5 resultados por grupo.
+- A lista da OpenDota (`/proPlayers`, `/teams`, `/teams/{id}/players`) é copiada para o banco uma vez por dia por um cron da Vercel (`/pros/refresh`, 09:00 UTC, protegido por `CRON_SECRET`). Visitar `/pros` com a lista vencida renova depois da resposta (rede de segurança). Uma trava de 10 minutos impede duas renovações ao mesmo tempo, e uma lista vazia ou minúscula da OpenDota é recusada em vez de apagar a boa.
+- `/pros/search` só lê o banco e responde vazio, sem consulta, para texto curto ou só de símbolos; a CDN guarda cada resposta por 5 minutos. Carregar uma página não faz pedido de busca.
+- Regras puras em `lib/pros.ts` (normalização de nick em qualquer alfabeto, times em destaque, "jogou há X", destino do Enter); dados em `lib/pros-data.ts`.
+- A preferência de animação avisa a mudança por um evento (`HERO_MOTION_EVENT`): menu e banner ficam em sincronia sem recarregar.
+- 240 testes (Vitest). Tempos aquecidos em `next start`: `/player` ~0,09–0,15 s, `/match` ~0,08 s, `/pros` na mesma faixa.
+
 ## [2.0.0] — 2026-11-10
 
 ### Adicionado
