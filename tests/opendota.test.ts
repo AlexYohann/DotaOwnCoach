@@ -164,6 +164,41 @@ describe("getMatch", () => {
     expect(p2.items).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
+  // Lone Druid: os itens ficam no urso, e a OpenDota os manda em additional_units.
+  it("copia os itens das unidades extras (urso do Lone Druid)", async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        match_id: 1,
+        players: [
+          {
+            player_slot: 0,
+            hero_id: 80,
+            item_neutral: 1861,
+            additional_units: [
+              { unitname: "spirit_bear", item_0: 249, item_1: 108, item_5: 158, backpack_1: 7, item_neutral: 0 },
+              null, // lixo
+              { item_0: 5 }, // sem nome: ignorada
+            ],
+          },
+          { player_slot: 1, hero_id: 2 }, // sem o campo
+          { player_slot: 2, hero_id: 3, additional_units: "lixo" },
+        ],
+      }),
+    );
+    const [druid, other, weird] = (await getMatch(1))!.players;
+    expect(druid.items).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(druid.units).toEqual([
+      {
+        name: "spirit_bear",
+        items: [249, 108, 0, 0, 0, 158],
+        backpack: [0, 7, 0],
+        neutral: [0, 0],
+      },
+    ]);
+    expect(other.units).toEqual([]);
+    expect(weird.units).toEqual([]);
+  });
+
   it("copia os cosméticos (nome, raridade, ícone) e só esses campos", async () => {
     fetchMock.mockResolvedValue(
       json({

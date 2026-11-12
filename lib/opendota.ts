@@ -55,6 +55,14 @@ export type Cosmetic = {
   img: string | null; // null = a OpenDota não tem o ícone
 };
 
+/** Unidade extra do jogador que carrega itens (urso do Lone Druid). */
+export type MatchUnit = {
+  name: string; // unitname da OpenDota, ex.: "spirit_bear"
+  items: number[];
+  backpack: number[];
+  neutral: number[];
+};
+
 export type MatchPlayer = {
   account_id: number | null; // null = jogador anônimo
   personaname: string | null;
@@ -75,6 +83,7 @@ export type MatchPlayer = {
   items: number[]; // item_0..item_5 (0 = vazio)
   backpack: number[]; // backpack_0..backpack_2
   neutral: number[]; // item_neutral + item_neutral2 (encantamento)
+  units: MatchUnit[]; // additional_units: no Lone Druid os itens ficam no urso
   cosmetics: Cosmetic[];
 };
 
@@ -222,7 +231,7 @@ export async function getItems(): Promise<Record<number, Item>> {
   }
 }
 
-type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral"> &
+type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral" | "units"> &
   Record<string, unknown>;
 type RawMatch = Omit<MatchDetail, "players"> & { players?: RawMatchPlayer[] };
 
@@ -240,9 +249,29 @@ function toCosmetics(raw: unknown): Cosmetic[] {
     }));
 }
 
+const ITEM_KEYS = ["item_0", "item_1", "item_2", "item_3", "item_4", "item_5"];
+const BACKPACK_KEYS = ["backpack_0", "backpack_1", "backpack_2"];
+const NEUTRAL_KEYS = ["item_neutral", "item_neutral2"];
+const slots = (p: Record<string, unknown>, keys: string[]) =>
+  keys.map((k) => (typeof p[k] === "number" ? (p[k] as number) : 0));
+
+// additional_units: mesmos campos de itens do jogador, um objeto por unidade.
+function toUnits(raw: unknown): MatchUnit[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (u): u is Record<string, unknown> =>
+        u !== null && typeof u === "object" && typeof u.unitname === "string" && !!u.unitname,
+    )
+    .map((u) => ({
+      name: u.unitname as string,
+      items: slots(u, ITEM_KEYS),
+      backpack: slots(u, BACKPACK_KEYS),
+      neutral: slots(u, NEUTRAL_KEYS),
+    }));
+}
+
 function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
-  const slots = (p: RawMatchPlayer, keys: string[]) =>
-    keys.map((k) => (typeof p[k] === "number" ? (p[k] as number) : 0));
 
   return {
     match_id: data.match_id,
@@ -269,9 +298,10 @@ function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
       hero_damage: p.hero_damage ?? null,
       tower_damage: p.tower_damage ?? null,
       hero_healing: p.hero_healing ?? null,
-      items: slots(p, ["item_0", "item_1", "item_2", "item_3", "item_4", "item_5"]),
-      backpack: slots(p, ["backpack_0", "backpack_1", "backpack_2"]),
-      neutral: slots(p, ["item_neutral", "item_neutral2"]),
+      items: slots(p, ITEM_KEYS),
+      backpack: slots(p, BACKPACK_KEYS),
+      neutral: slots(p, NEUTRAL_KEYS),
+      units: toUnits(p.additional_units),
       cosmetics: toCosmetics(p.cosmetics),
     })),
   };

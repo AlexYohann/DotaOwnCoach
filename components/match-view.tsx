@@ -38,6 +38,13 @@ export type ViewPlayer = {
   items: (ViewItem | null)[];
   backpack: (ViewItem | null)[];
   neutral: (ViewItem | null)[];
+  /** Unidades que carregam itens além do herói (urso do Lone Druid). */
+  units: {
+    label: string;
+    items: (ViewItem | null)[];
+    backpack: (ViewItem | null)[];
+    neutral: (ViewItem | null)[];
+  }[];
   cosmetics: Cosmetic[];
 };
 
@@ -184,6 +191,16 @@ function PlayerPanel({ player: p }: { player: ViewPlayer }) {
         <ItemList label="Itens" items={p.items} />
         <ItemList label="Mochila" items={p.backpack} />
         <ItemList label="Neutro" items={p.neutral} />
+        {p.units.map((u, i) => (
+          <div key={i} className="mt-2 flex flex-col gap-2 border-t border-line pt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[.12em] text-ember">
+              {u.label}
+            </p>
+            <ItemList label="Itens" items={u.items} />
+            <ItemList label="Mochila" items={u.backpack} />
+            <ItemList label="Neutro" items={u.neutral} />
+          </div>
+        ))}
       </div>
 
       <Cosmetics items={p.cosmetics} />
