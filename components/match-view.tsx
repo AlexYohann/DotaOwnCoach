@@ -7,6 +7,7 @@ import { HeroBanner } from "@/components/hero-banner";
 import { ItemList, type ViewItem } from "@/components/match-items";
 import { ResultText, SideText } from "@/components/result-text";
 import { SiteHeader } from "@/components/site-header";
+import { MatchTip } from "@/components/match-tip";
 import { TeamTables } from "@/components/team-tables";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { rarityColor } from "@/lib/hero-art";
@@ -128,6 +129,7 @@ export function MatchView({
       </div>
 
       <div className="w-full max-w-6xl mx-auto px-6 pb-10">
+        <MatchTip />
         <TeamTables
           players={players}
           selectedSlot={selectedSlot}
