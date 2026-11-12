@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { HeroRender } from "@/components/hero-render";
 import {
+  HERO_MOTION_EVENT,
   ILLUSTRATION_URL,
   readHeroMotion,
   saveHeroMotion,
@@ -47,12 +48,22 @@ export function HeroBanner({
   children: React.ReactNode;
 }) {
   const [motion, setMotion] = useState<HeroMotion>("playing");
-  useEffect(() => setMotion(readHeroMotion(browserStorage())), []);
+  useEffect(() => {
+    setMotion(readHeroMotion(browserStorage()));
+    // A troca também pode vir do menu da conta: o herói obedece na hora.
+    const onChange = (e: Event) => {
+      const next = (e as CustomEvent<HeroMotion>).detail;
+      if (next === "playing" || next === "paused") setMotion(next);
+    };
+    window.addEventListener(HERO_MOTION_EVENT, onChange);
+    return () => window.removeEventListener(HERO_MOTION_EVENT, onChange);
+  }, []);
 
   function toggleMotion() {
     const next: HeroMotion = motion === "paused" ? "playing" : "paused";
     setMotion(next);
     saveHeroMotion(browserStorage(), next);
+    window.dispatchEvent(new CustomEvent(HERO_MOTION_EVENT, { detail: next }));
   }
 
   return (

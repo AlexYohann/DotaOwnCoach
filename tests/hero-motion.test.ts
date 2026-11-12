@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readHeroMotion, saveHeroMotion } from "@/lib/hero-art";
+import { HERO_MOTION_EVENT, readHeroMotion, saveHeroMotion } from "@/lib/hero-art";
 
 const mem = () => {
   const m = new Map<string, string>();
@@ -18,6 +18,10 @@ const broken = {
 };
 
 describe("preferência de animação do herói", () => {
+  it("nome do evento que avisa a troca (banner ↔ menu da conta)", () => {
+    expect(HERO_MOTION_EVENT).toBe("dota-own-coach:hero-motion");
+  });
+
   it("padrão: animando (mesmo sem nada salvo)", () => {
     expect(readHeroMotion(mem())).toBe("playing");
   });
