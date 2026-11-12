@@ -326,6 +326,15 @@ const text = (v: unknown): string | null =>
   typeof v === "string" && v.trim() ? v.trim() : null;
 const positiveInt = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v > 0;
+// Datas conferidas aqui: um valor estranho num único registro faria o banco
+// recusar o lote inteiro (coluna timestamptz) e a renovação nunca concluiria.
+const isoDate = (v: unknown): string | null => {
+  const s = text(v);
+  return s !== null && !Number.isNaN(Date.parse(s)) ? s : null;
+};
+const MAX_UNIX_SECONDS = 4_102_444_800; // ano 2100
+const unixSeconds = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) && v > 0 && v < MAX_UNIX_SECONDS ? v : null;
 
 async function requestList(path: string): Promise<Record<string, unknown>[]> {
   const data = await request<unknown>(path, LIST_TIMEOUT_MS);
@@ -340,9 +349,11 @@ async function requestList(path: string): Promise<Record<string, unknown>[]> {
 export async function getProPlayers(): Promise<ProPlayer[]> {
   const list = await requestList("/proPlayers");
   const out: ProPlayer[] = [];
+  const seen = new Set<number>(); // ID repetido no mesmo lote faria o upsert falhar
   for (const p of list) {
     const name = text(p.name);
-    if (!positiveInt(p.account_id) || !name) continue;
+    if (!positiveInt(p.account_id) || !name || seen.has(p.account_id)) continue;
+    seen.add(p.account_id);
     out.push({
       account_id: p.account_id,
       name,
@@ -352,7 +363,7 @@ export async function getProPlayers(): Promise<ProPlayer[]> {
       team_name: text(p.team_name),
       team_tag: text(p.team_tag),
       verified: p.is_locked === true,
-      last_match_time: text(p.last_match_time),
+      last_match_time: isoDate(p.last_match_time),
     });
   }
   return out;
@@ -362,15 +373,17 @@ export async function getProPlayers(): Promise<ProPlayer[]> {
 export async function getTeams(): Promise<ProTeam[]> {
   const list = await requestList("/teams");
   const out: ProTeam[] = [];
+  const seen = new Set<number>();
   for (const t of list) {
-    if (!positiveInt(t.team_id) || typeof t.rating !== "number") continue;
+    if (!positiveInt(t.team_id) || typeof t.rating !== "number" || seen.has(t.team_id)) continue;
+    seen.add(t.team_id);
     out.push({
       team_id: t.team_id,
       name: text(t.name) ?? `Time ${t.team_id}`,
       tag: text(t.tag),
       logo_url: text(t.logo_url),
       rating: t.rating,
-      last_match_time: typeof t.last_match_time === "number" ? t.last_match_time : null,
+      last_match_time: unixSeconds(t.last_match_time),
     });
   }
   return out;

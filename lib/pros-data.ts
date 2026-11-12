@@ -99,10 +99,21 @@ async function fetchSnapshot(): Promise<Snapshot> {
   }
   const rosters = new Map<number, RosterEntry[]>();
   const featured = featuredTeams(teams, Date.now());
+  // HTTP 200 com conteúdo ruim também é falha: sem time ativo ou com elenco
+  // vazio, gravar trocaria os cartões bons de /pros por nada.
+  if (featured.length === 0) {
+    throw new OpenDotaError("unavailable", "lista suspeita da OpenDota: nenhum time ativo");
+  }
   for (let i = 0; i < featured.length; i++) {
     if (i > 0) await pause(ROSTER_PAUSE_MS);
-    const members = await getTeamPlayers(featured[i].team_id);
-    rosters.set(featured[i].team_id, currentRoster(members));
+    const roster = currentRoster(await getTeamPlayers(featured[i].team_id));
+    if (roster.length === 0) {
+      throw new OpenDotaError(
+        "unavailable",
+        `elenco vazio da OpenDota para o time ${featured[i].team_id}`,
+      );
+    }
+    rosters.set(featured[i].team_id, roster);
   }
   return { players, teams, rosters };
 }

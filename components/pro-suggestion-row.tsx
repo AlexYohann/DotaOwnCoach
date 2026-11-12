@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TeamCrest } from "@/components/team-crest";
 import { lastPlayedLabel, safeLogoUrl, type ProSuggestion } from "@/lib/pros";
 import { cn } from "@/lib/utils";
@@ -33,12 +33,18 @@ export function ProAvatar({
 }) {
   const [failed, setFailed] = useState(false);
   const url = safeLogoUrl(src);
+  // Mesmo cuidado do TeamCrest: falha antes de o React assumir a página.
+  const img = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (img.current?.complete && img.current.naturalWidth === 0) setFailed(true);
+  }, []);
   const box = { width: size, height: size };
 
   if (url && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        ref={img}
         src={url}
         alt=""
         width={size}

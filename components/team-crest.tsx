@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { safeLogoUrl } from "@/lib/pros";
 
 /**
@@ -18,11 +18,18 @@ export function TeamCrest({
 }) {
   const [failed, setFailed] = useState(false);
   const src = safeLogoUrl(logo);
+  // Em /pros a imagem vem no HTML do servidor: se ela falhar antes de o React
+  // assumir a página, o onError já passou. Confere uma vez ao montar.
+  const img = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (img.current?.complete && img.current.naturalWidth === 0) setFailed(true);
+  }, []);
 
   if (src && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        ref={img}
         src={src}
         alt=""
         width={size}

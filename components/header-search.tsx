@@ -73,12 +73,13 @@ export function HeaderSearch({ size = "sm" }: { size?: "sm" | "lg" }) {
   function handleChange(text: string) {
     setValue(text);
     cancelPending();
+    // O texto mudou: a linha escolhida com as setas era de outra busca.
+    setActive(-1);
     const q = cleanQuery(text);
     if (q === null) {
       // Menos de 2 caracteres úteis: não chama o servidor e fecha a lista.
       setLoaded(null);
       setOpen(false);
-      setActive(-1);
       return;
     }
     timer.current = setTimeout(async () => {
@@ -87,15 +88,18 @@ export function HeaderSearch({ size = "sm" }: { size?: "sm" | "lg" }) {
   }
 
   const q = cleanQuery(value);
-  // Só vale o que foi buscado para o texto que está no campo agora.
+  // Para o Enter só vale o que foi buscado para o texto que está no campo agora.
   const current = loaded && loaded.q === q ? loaded : null;
-  const verified = current?.result.verified ?? [];
-  const others = current?.result.others ?? [];
+  // Na tela, as sugestões anteriores ficam até as novas chegarem: sem isso a
+  // lista fechava e reabria a cada tecla.
+  const shown = q !== null ? loaded : null;
+  const verified = shown?.result.verified ?? [];
+  const others = shown?.result.others ?? [];
   const flat: ProSuggestion[] = [...verified, ...others];
   const onlyDigits = /^\d+$/.test(value.trim());
   // Número sem pro com esse nick: é busca por ID, não há o que avisar.
-  const showEmpty = current !== null && flat.length === 0 && !onlyDigits;
-  const expanded = open && (flat.length > 0 || showEmpty);
+  const showEmpty = open && current !== null && flat.length === 0 && !onlyDigits;
+  const expanded = open && flat.length > 0;
 
   function go(path: string) {
     cancelPending();
@@ -110,9 +114,9 @@ export function HeaderSearch({ size = "sm" }: { size?: "sm" | "lg" }) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    let first = flat[0] ?? null;
+    let first = current ? (flat[0] ?? null) : null;
     // Enter antes de as sugestões deste texto chegarem: busca agora.
-    if (!current && q !== null && !onlyDigits && active < 0) {
+    if (!current && q !== null && !onlyDigits && !flat[active]) {
       const fresh = await load(q);
       if (!fresh) return;
       first = fresh.result.verified[0] ?? fresh.result.others[0] ?? null;
@@ -148,7 +152,7 @@ export function HeaderSearch({ size = "sm" }: { size?: "sm" | "lg" }) {
       pro={pro}
       query={value}
       active={index === active}
-      nowMs={current?.nowMs ?? 0}
+      nowMs={shown?.nowMs ?? 0}
       onSelect={() => go(`/player/${pro.accountId}`)}
       onHover={() => setActive(index)}
     />
@@ -229,11 +233,6 @@ export function HeaderSearch({ size = "sm" }: { size?: "sm" | "lg" }) {
             {others.map((pro, i) => row(pro, verified.length + i))}
           </div>
         )}
-        {showEmpty && (
-          <p className="px-3 py-3 text-xs text-muted-foreground">
-            Nenhum pro com esse nome. Para outros jogadores, use o ID.
-          </p>
-        )}
         {flat.length > 0 && (
           <div
             aria-hidden
@@ -243,6 +242,14 @@ export function HeaderSearch({ size = "sm" }: { size?: "sm" | "lg" }) {
           </div>
         )}
       </div>
+      {/* Fora do listbox (que só aceita opções) e sempre montado: role="status"
+          faz o leitor de tela anunciar quando o texto aparece. Vazio, some. */}
+      <p
+        role="status"
+        className="absolute left-0 right-0 top-full z-50 mt-1.5 whitespace-normal rounded-lg border border-line bg-panel px-3 py-3 text-xs text-muted-foreground shadow-[0_18px_40px_rgba(0,0,0,0.6)] empty:hidden"
+      >
+        {showEmpty ? "Nenhum pro com esse nome. Para outros jogadores, use o ID." : null}
+      </p>
     </form>
   );
 }

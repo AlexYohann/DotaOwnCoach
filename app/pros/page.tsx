@@ -12,6 +12,10 @@ import { getFeaturedTeams, type FeaturedTeam } from "@/lib/pros-data";
 
 export const metadata: Metadata = { title: "Pro players" };
 
+// A renovação que roda depois da resposta (rede de segurança) leva ~10–20 s
+// por causa das pausas entre as chamadas de elenco; o padrão cortaria no meio.
+export const maxDuration = 60;
+
 const ACCOUNT = <HeaderAccountSlot />;
 
 // A caixa do cabeçalho some aqui (search={false}): a busca grande do corpo é a
@@ -68,6 +72,14 @@ async function FeaturedTeams() {
       <div className="mt-4">
         <OpenDotaErrorMessage error={err} />
       </div>
+    );
+  }
+
+  if (teams.length === 0) {
+    return (
+      <p className="mt-4 text-sm text-muted-foreground">
+        Ainda não há times para mostrar. Tente de novo em alguns minutos.
+      </p>
     );
   }
 

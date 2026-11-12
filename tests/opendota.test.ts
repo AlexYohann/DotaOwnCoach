@@ -274,6 +274,22 @@ describe("getProPlayers", () => {
     expect(out.map((p) => p.account_id)).toEqual([12]);
   });
 
+  // Revisão final: um registro estranho não pode fazer o banco recusar o lote inteiro.
+  it("data que não é data vira null; ID repetido entra uma vez só", async () => {
+    fetchMock.mockResolvedValue(
+      json([
+        rawPro({ account_id: 20, name: "a", last_match_time: "lixo" }),
+        rawPro({ account_id: 21, name: "b", last_match_time: "2026-11-01T12:00:00.000Z" }),
+        rawPro({ account_id: 21, name: "b de novo" }),
+      ]),
+    );
+    const out = await getProPlayers();
+    expect(out.map((p) => [p.account_id, p.name, p.last_match_time])).toEqual([
+      [20, "a", null],
+      [21, "b", "2026-11-01T12:00:00.000Z"],
+    ]);
+  });
+
   it("corpo que não é lista lança OpenDotaError unavailable", async () => {
     fetchMock.mockResolvedValue(json({}));
     const err = await getProPlayers().catch((e) => e);
@@ -303,6 +319,21 @@ describe("getTeams", () => {
       { team_id: 2, name: "Sem logo", tag: null, logo_url: null, rating: 1400, last_match_time: null },
     ]);
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.opendota.com/api/teams");
+  });
+
+  it("horário absurdo vira null; time repetido entra uma vez só", async () => {
+    fetchMock.mockResolvedValue(
+      json([
+        { team_id: 5, name: "A", rating: 1500, last_match_time: 1e300 },
+        { team_id: 6, name: "B", rating: 1400, last_match_time: -1 },
+        { team_id: 6, name: "B de novo", rating: 1300, last_match_time: 1793500000 },
+      ]),
+    );
+    const out = await getTeams();
+    expect(out.map((t) => [t.team_id, t.name, t.last_match_time])).toEqual([
+      [5, "A", null],
+      [6, "B", null],
+    ]);
   });
 
   it("corpo que não é lista lança unavailable", async () => {

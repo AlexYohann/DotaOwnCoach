@@ -305,6 +305,25 @@ describe("refreshPros", () => {
     expect(completed()).toHaveLength(0);
   });
 
+  // Revisão final: HTTP 200 com conteúdo ruim também não pode apagar os elencos bons.
+  it("um elenco vem vazio: recusa gravar (não troca o elenco bom por nada)", async () => {
+    let n = 0;
+    api.getTeamPlayers.mockImplementation(async (id: number) => (++n === 2 ? [] : membersOf(id)));
+    const out = await settle(refreshPros());
+    expect(out).toBeInstanceOf(od.OpenDotaError);
+    expect(writes()).toHaveLength(0);
+    expect(completed()).toHaveLength(0);
+  });
+
+  it("nenhum time ativo (last_match_time ausente em todos): recusa gravar", async () => {
+    api.getTeams.mockResolvedValue(teams(150).map((t) => ({ ...t, last_match_time: null })));
+    const out = await settle(refreshPros());
+    expect(out).toBeInstanceOf(od.OpenDotaError);
+    expect(api.getTeamPlayers).not.toHaveBeenCalled();
+    expect(writes()).toHaveLength(0);
+    expect(completed()).toHaveLength(0);
+  });
+
   it("erro ao gravar pro_players: não apaga nada e não marca como concluído", async () => {
     db.failUpsert = "pro_players";
     const out = await settle(refreshPros());

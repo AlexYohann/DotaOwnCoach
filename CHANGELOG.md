@@ -23,7 +23,8 @@ Cada versão tem uma tag git `vX.Y.Z`.
 - `/pros/search` só lê o banco e responde vazio, sem consulta, para texto curto ou só de símbolos; a CDN guarda cada resposta por 5 minutos. Carregar uma página não faz pedido de busca.
 - Regras puras em `lib/pros.ts` (normalização de nick em qualquer alfabeto, times em destaque, "jogou há X", destino do Enter); dados em `lib/pros-data.ts`.
 - A preferência de animação avisa a mudança por um evento (`HERO_MOTION_EVENT`): menu e banner ficam em sincronia sem recarregar.
-- 240 testes (Vitest). Tempos aquecidos em `next start`: `/player` ~0,09–0,15 s, `/match` ~0,08 s, `/pros` na mesma faixa.
+- Revisão final (antes do merge): (1) `search_pros` confere o texto ela mesma (2 a 32 caracteres, sem `%`, `_` ou ``) — a função é chamável direto com a chave pública, e um texto enorme fazia o banco calcular semelhança contra a tabela inteira (migração `20261112010000_v2_1_search_pros_guard.sql`); (2) elenco vazio ou nenhum time ativo vindos da OpenDota com HTTP 200 são recusados em vez de apagar os cartões bons; (3) data malformada ou ID repetido num registro não derrubam mais a renovação inteira.
+- 244 testes (Vitest). Tempos aquecidos em `next start`: `/player` ~0,09–0,15 s, `/match` ~0,08 s, `/pros` na mesma faixa.
 
 ## [2.0.0] — 2026-11-10
 
