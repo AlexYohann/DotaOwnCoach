@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toAccountId } from "@/lib/steam";
+import { steamProfileUrl, toAccountId } from "@/lib/steam";
 
 describe("toAccountId", () => {
   it("aceita Friend ID (32 bits)", () => {
@@ -33,5 +33,16 @@ describe("toAccountId", () => {
 
   it("rejeita SteamID64 que vira account_id 0", () => {
     expect(toAccountId("76561197960265728")).toBeNull();
+  });
+});
+
+describe("steamProfileUrl", () => {
+  it("monta o endereço do perfil com o SteamID64", () => {
+    expect(steamProfileUrl(321580662)).toBe(
+      "https://steamcommunity.com/profiles/76561198281846390",
+    );
+    expect(steamProfileUrl(105248644)).toBe(
+      "https://steamcommunity.com/profiles/76561198065514372",
+    );
   });
 });
