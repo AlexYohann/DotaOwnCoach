@@ -81,7 +81,7 @@ Dividida em 2026-11-10 (decisão do Alex): o login virou a parte arriscada e nã
   - Pronto quando: digitar `yatorro` mostra o Yatoro da Team Spirit entre os verificados, e recarregar `/pros` não gera chamadas à OpenDota.
 - **v2.2: quem joga comigo.** As pessoas com quem você mais joga e como vocês se saem juntos (`/players/{id}/peers` da OpenDota). Não usa a lista de amigos da Steam, que exigiria chave da API e lista pública.
 - **v2.3: diário.**
-  - **Pré-requisito: backup automático do banco.** As notas são escritas pelos usuários e não existem em nenhum outro lugar. O plano gratuito do Supabase não garante backup: antes de abrir o diário, uma tarefa agendada (GitHub Actions) exporta o banco todo dia (`supabase db dump`) e guarda as últimas cópias fora do Supabase. Alternativa paga: plano Pro (7 dias de backups diários).
+  - **Pré-requisito (feito em 2026-11-12): backup automático do banco**, em `.github/workflows/backup-db.yml`; ver "Como voltar uma versão". Motivo original: As notas são escritas pelos usuários e não existem em nenhum outro lugar. O plano gratuito do Supabase não garante backup: antes de abrir o diário, uma tarefa agendada (GitHub Actions) exporta o banco todo dia (`supabase db dump`) e guarda as últimas cópias fora do Supabase. Alternativa paga: plano Pro (7 dias de backups diários).
   - Tabela `match_notes`, com uma nota por partida: o que errou, o que fez bem e tags.
   - RLS privado: cada usuário só lê e edita as próprias notas.
   - Notas ao lado de cada partida em "Minhas partidas".
@@ -164,6 +164,15 @@ Cada versão tem uma tag (`vX.Y.Z`) no GitHub, e todo push na `main` publica na 
   npm test && git push
   ```
   Versões sem merge (correções como v1.4.1) se desfazem com `git revert <hash do commit>`.
-- **Banco de dados:** as migrações de `supabase/migrations/` só adicionam tabelas, então voltar o código não exige mexer no banco. Dados apagados não voltam pelo git: veja o backup (pré-requisito da v2.3).
+- **Banco de dados:** as migrações de `supabase/migrations/` só adicionam tabelas, então voltar o código não exige mexer no banco. Dados apagados não voltam pelo git: use o backup (abaixo).
+- **Backup do banco:** o fluxo `.github/workflows/backup-db.yml` exporta o banco todo dia às 04:00 (Brasília) e guarda as cópias dos últimos 30 dias como artefatos do GitHub Actions (aba **Actions → Backup do banco → uma execução → Artifacts**). O arquivo é criptografado, porque o repositório é público e o backup inclui os usuários; a senha é o segredo `BACKUP_PASSPHRASE`. Para restaurar num banco (de preferência um projeto Supabase novo, para conferir antes):
+  ```bash
+  unzip dota-own-coach-AAAA-MM-DD.zip
+  gpg --decrypt dota-own-coach-AAAA-MM-DD.tar.gz.gpg | tar -xzf -     # pede a senha
+  psql "<endereço de conexão do banco>" --single-transaction --variable ON_ERROR_STOP=1 \
+    --file backup/roles.sql --file backup/schema.sql \
+    --command 'SET session_replication_role = replica' --file backup/data.sql
+  ```
+  O GitHub desliga fluxos agendados de repositórios sem atividade há 60 dias e avisa por e-mail; basta reativar na aba Actions. Se o backup falhar, o GitHub também avisa por e-mail.
 - **Configuração fora do código:** o painel do Supabase Auth (cadastro e provedor de e-mail desligados desde a v2.0) e as variáveis de ambiente da Vercel não são versionados. Uma versão anterior à v2.0 não tem login, então não depende deles.
 
