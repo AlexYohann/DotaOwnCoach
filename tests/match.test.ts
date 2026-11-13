@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatStartTime,
   getSide,
+  unitLabel,
   isWin,
 } from "@/lib/match";
 
@@ -53,6 +54,13 @@ describe("formatação de data (horário de Brasília)", () => {
   it("formatStartTime recebe segundos unix", () => {
     const unix = Date.UTC(2026, 10, 6, 21, 42) / 1000;
     expect(formatStartTime(unix)).toBe("06/11/2026, 18:42");
+  });
+});
+
+describe("unitLabel", () => {
+  it("urso do Lone Druid; o resto vira Unidade", () => {
+    expect(unitLabel("spirit_bear")).toBe("Urso");
+    expect(unitLabel("npc_dota_outra_coisa")).toBe("Unidade");
   });
 });
 

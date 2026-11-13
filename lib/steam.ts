@@ -17,3 +17,8 @@ export function toAccountId(input: string): number | null {
   if (value < BigInt(1) || value > MAX_ACCOUNT_ID) return null;
   return Number(value);
 }
+
+/** Endereço do perfil na Steam (o SteamID64 passa de 2^53, por isso BigInt). */
+export function steamProfileUrl(accountId: number): string {
+  return `https://steamcommunity.com/profiles/${STEAM_ID64_BASE + BigInt(accountId)}`;
+}

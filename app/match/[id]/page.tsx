@@ -13,7 +13,7 @@ import {
   StatusMessage,
 } from "@/components/status-message";
 import { heroKey } from "@/lib/hero-art";
-import { formatDuration, formatStartTime } from "@/lib/match";
+import { formatDuration, formatStartTime, unitLabel } from "@/lib/match";
 import { getHeroes, getMatchData } from "@/lib/data";
 import {
   getItems,
@@ -151,6 +151,13 @@ async function MatchContent({
     items: p.items.map(resolveItem),
     backpack: p.backpack.map(resolveItem),
     neutral: p.neutral.map(resolveItem),
+    // Urso do Lone Druid: é ele quem carrega os itens.
+    units: (p.units ?? []).map((u) => ({
+      label: unitLabel(u.name),
+      items: u.items.map(resolveItem),
+      backpack: u.backpack.map(resolveItem),
+      neutral: u.neutral.map(resolveItem),
+    })),
     cosmetics: p.cosmetics ?? [], // detail antigo (v1) sem o campo: lista vazia
   }));
 

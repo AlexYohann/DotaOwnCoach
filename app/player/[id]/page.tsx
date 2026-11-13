@@ -1,10 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
+import { after } from "next/server";
 import { Suspense } from "react";
 import { HeaderAccountSlot } from "@/components/header-account";
 import { HeroBanner } from "@/components/hero-banner";
 import { HeroCell } from "@/components/hero-cell";
 import { PageShell } from "@/components/page-shell";
+import { VerifiedBadge } from "@/components/pro-suggestion-row";
 import { ResultText, SideText } from "@/components/result-text";
 import { SiteHeader } from "@/components/site-header";
 import {
@@ -12,6 +14,7 @@ import {
   StatusMessage,
 } from "@/components/status-message";
 import { Button } from "@/components/ui/button";
+import { getViewerAccountId } from "@/lib/account";
 import { getHeroes, getPlayerData, type PlayerData } from "@/lib/data";
 import { heroKey } from "@/lib/hero-art";
 import {
@@ -23,7 +26,9 @@ import {
 } from "@/lib/match";
 import type { Hero, RecentMatch } from "@/lib/opendota";
 import { formatDecimal, mostPlayed, type MostPlayed } from "@/lib/player-summary";
-import { toAccountId } from "@/lib/steam";
+import { refreshOwnProfile } from "@/lib/profile-refresh";
+import { getVerifiedPro } from "@/lib/pros-data";
+import { steamProfileUrl, toAccountId } from "@/lib/steam";
 import { cn } from "@/lib/utils";
 
 const PUBLIC_DATA_TIP =
@@ -78,12 +83,17 @@ async function PlayerContent({
 
   let player: PlayerData | null;
   let heroes: Record<number, Hero>;
+  let pro: Awaited<ReturnType<typeof getVerifiedPro>>;
+  let viewerId: number | null;
   try {
     // Banco primeiro (10 min), OpenDota se vencido — ver lib/data.ts.
     // getHeroes nunca lança: se falhar, devolve {} e a tabela mostra o hero_id.
-    [player, heroes] = await Promise.all([
+    // getVerifiedPro também nunca lança e sai em paralelo: não soma tempo.
+    [player, heroes, pro, viewerId] = await Promise.all([
       getPlayerData(accountId),
       getHeroes(),
+      getVerifiedPro(accountId),
+      getViewerAccountId(),
     ]);
   } catch (err) {
     return (
@@ -91,6 +101,13 @@ async function PlayerContent({
         <OpenDotaErrorMessage error={err} />
       </PageShell>
     );
+  }
+
+  // Logado vendo as PRÓPRIAS partidas: pede à OpenDota o nome e o avatar
+  // atuais da Steam, no máximo uma vez por dia e depois da resposta (a OpenDota
+  // não renova o perfil sozinha — quem trocava de nome ficava com o antigo).
+  if (viewerId === accountId) {
+    after(() => refreshOwnProfile(accountId));
   }
 
   if (!player) {
@@ -139,9 +156,28 @@ async function PlayerContent({
         <h1 className="font-display text-4xl font-bold uppercase leading-none">
           {name}
         </h1>
+        {/* Só pro verificado: o nome da Steam (acima) quase nunca é o nick. */}
+        {pro && (
+          <p className="mt-2 flex flex-wrap items-center gap-1.5 text-sm">
+            <span className="text-muted-foreground">Pro:</span>
+            <span className="font-semibold">{pro.name}</span>
+            <VerifiedBadge />
+            {pro.teamName && (
+              <span className="text-muted-foreground">· {pro.teamName}</span>
+            )}
+          </p>
+        )}
         <p className="mt-2 text-xs text-muted-foreground">
           {accountId} · últimas {matches.length} partidas · dados de{" "}
-          {formatDateTime(freshness.fetchedAt)}
+          {formatDateTime(freshness.fetchedAt)} ·{" "}
+          <a
+            href={steamProfileUrl(accountId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink underline underline-offset-4"
+          >
+            Perfil na Steam ↗
+          </a>
         </p>
         {freshness.source === "stale" && (
           <p className="mt-2 text-sm text-amber-400">

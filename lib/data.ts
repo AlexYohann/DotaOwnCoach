@@ -20,7 +20,7 @@ const PLAYER_TTL_MS = 10 * 60 * 1000; // perfil + partidas recentes: 10 min
 const HEROES_TTL_MS = 24 * 60 * 60 * 1000; // heróis: 1 dia
 // Versão do formato de matches.detail. Se o formato mudar (ex.: linha do tempo
 // da v5), sobe este número e as partidas antigas são buscadas de novo.
-const DETAIL_VERSION = 2; // v1.4: + cosméticos
+const DETAIL_VERSION = 3; // v1.4: + cosméticos; v2.1: + unidades extras (urso do Lone Druid)
 
 /** De onde vieram os dados mostrados. */
 export type Freshness = {

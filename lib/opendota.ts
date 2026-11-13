@@ -55,6 +55,14 @@ export type Cosmetic = {
   img: string | null; // null = a OpenDota não tem o ícone
 };
 
+/** Unidade extra do jogador que carrega itens (urso do Lone Druid). */
+export type MatchUnit = {
+  name: string; // unitname da OpenDota, ex.: "spirit_bear"
+  items: number[];
+  backpack: number[];
+  neutral: number[];
+};
+
 export type MatchPlayer = {
   account_id: number | null; // null = jogador anônimo
   personaname: string | null;
@@ -75,6 +83,7 @@ export type MatchPlayer = {
   items: number[]; // item_0..item_5 (0 = vazio)
   backpack: number[]; // backpack_0..backpack_2
   neutral: number[]; // item_neutral + item_neutral2 (encantamento)
+  units: MatchUnit[]; // additional_units: no Lone Druid os itens ficam no urso
   cosmetics: Cosmetic[];
 };
 
@@ -101,13 +110,13 @@ export class OpenDotaError extends Error {
 }
 
 /** Devolve o JSON, ou null em 404. Lança OpenDotaError nos demais problemas. */
-async function request<T>(path: string): Promise<T | null> {
+async function request<T>(path: string, timeoutMs = TIMEOUT_MS): Promise<T | null> {
   // Uma linha por chamada REAL à API: é assim que se confere o cache (v1.3).
   console.info(`[OpenDota] GET ${path}`);
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     // Erro de rede ou timeout.
@@ -127,6 +136,27 @@ async function request<T>(path: string): Promise<T | null> {
   } catch {
     throw new OpenDotaError("unavailable", `JSON inválido em ${path}`);
   }
+}
+
+/**
+ * Pede à OpenDota para buscar de novo o perfil da conta na Steam (nome e
+ * avatar). Ela não renova sozinha com frequência. Use com parcimônia: cada
+ * pedido também a faz reprocessar o histórico da conta. Lança OpenDotaError.
+ */
+export async function requestPlayerRefresh(accountId: number): Promise<void> {
+  const path = `/players/${accountId}/refresh`;
+  console.info(`[OpenDota] POST ${path}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new OpenDotaError("unavailable", `Falha ao chamar ${path}: ${err}`);
+  }
+  if (res.status === 429) throw new OpenDotaError("rate_limit", `429 em ${path}`);
+  if (!res.ok) throw new OpenDotaError("unavailable", `HTTP ${res.status} em ${path}`);
 }
 
 /** null = jogador não existe na OpenDota. */
@@ -222,7 +252,7 @@ export async function getItems(): Promise<Record<number, Item>> {
   }
 }
 
-type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral"> &
+type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral" | "units"> &
   Record<string, unknown>;
 type RawMatch = Omit<MatchDetail, "players"> & { players?: RawMatchPlayer[] };
 
@@ -240,9 +270,29 @@ function toCosmetics(raw: unknown): Cosmetic[] {
     }));
 }
 
+const ITEM_KEYS = ["item_0", "item_1", "item_2", "item_3", "item_4", "item_5"];
+const BACKPACK_KEYS = ["backpack_0", "backpack_1", "backpack_2"];
+const NEUTRAL_KEYS = ["item_neutral", "item_neutral2"];
+const slots = (p: Record<string, unknown>, keys: string[]) =>
+  keys.map((k) => (typeof p[k] === "number" ? (p[k] as number) : 0));
+
+// additional_units: mesmos campos de itens do jogador, um objeto por unidade.
+function toUnits(raw: unknown): MatchUnit[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (u): u is Record<string, unknown> =>
+        u !== null && typeof u === "object" && typeof u.unitname === "string" && !!u.unitname,
+    )
+    .map((u) => ({
+      name: u.unitname as string,
+      items: slots(u, ITEM_KEYS),
+      backpack: slots(u, BACKPACK_KEYS),
+      neutral: slots(u, NEUTRAL_KEYS),
+    }));
+}
+
 function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
-  const slots = (p: RawMatchPlayer, keys: string[]) =>
-    keys.map((k) => (typeof p[k] === "number" ? (p[k] as number) : 0));
 
   return {
     match_id: data.match_id,
@@ -269,9 +319,10 @@ function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
       hero_damage: p.hero_damage ?? null,
       tower_damage: p.tower_damage ?? null,
       hero_healing: p.hero_healing ?? null,
-      items: slots(p, ["item_0", "item_1", "item_2", "item_3", "item_4", "item_5"]),
-      backpack: slots(p, ["backpack_0", "backpack_1", "backpack_2"]),
-      neutral: slots(p, ["item_neutral", "item_neutral2"]),
+      items: slots(p, ITEM_KEYS),
+      backpack: slots(p, BACKPACK_KEYS),
+      neutral: slots(p, NEUTRAL_KEYS),
+      units: toUnits(p.additional_units),
       cosmetics: toCosmetics(p.cosmetics),
     })),
   };
@@ -285,4 +336,124 @@ export async function getMatch(matchId: number): Promise<MatchDetail | null> {
   const data = await request<RawMatch>(`/matches/${matchId}`);
   if (!data || !Array.isArray(data.players)) return null;
   return toMatchDetail(data, data.players);
+}
+
+// ---------------------------------------------------------------------------
+// v2.1: pro players e times. Sem cache aqui: quem guarda é o banco
+// (lib/pros-data.ts), renovado uma vez por dia.
+
+// /proPlayers (~5.700 registros) e /teams (1.000) são respostas grandes.
+const LIST_TIMEOUT_MS = 20000;
+
+export type ProPlayer = {
+  account_id: number;
+  name: string; // nick de pro
+  personaname: string | null; // nome atual na Steam
+  avatar: string | null;
+  team_id: number | null;
+  team_name: string | null;
+  team_tag: string | null;
+  verified: boolean; // "is_locked": conta confirmada pela OpenDota
+  last_match_time: string | null; // ISO
+};
+
+export type ProTeam = {
+  team_id: number;
+  name: string;
+  tag: string | null;
+  logo_url: string | null;
+  rating: number; // Elo: começa em 1000
+  last_match_time: number | null; // segundos Unix
+};
+
+export type TeamMember = {
+  account_id: number;
+  name: string | null;
+  games_played: number;
+  is_current_team_member: boolean | null;
+};
+
+const text = (v: unknown): string | null =>
+  typeof v === "string" && v.trim() ? v.trim() : null;
+const positiveInt = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v > 0;
+// Datas conferidas aqui: um valor estranho num único registro faria o banco
+// recusar o lote inteiro (coluna timestamptz) e a renovação nunca concluiria.
+const isoDate = (v: unknown): string | null => {
+  const s = text(v);
+  return s !== null && !Number.isNaN(Date.parse(s)) ? s : null;
+};
+const MAX_UNIX_SECONDS = 4_102_444_800; // ano 2100
+const unixSeconds = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) && v > 0 && v < MAX_UNIX_SECONDS ? v : null;
+
+async function requestList(path: string): Promise<Record<string, unknown>[]> {
+  const data = await request<unknown>(path, LIST_TIMEOUT_MS);
+  if (!Array.isArray(data)) {
+    throw new OpenDotaError("unavailable", `${path} não devolveu uma lista`);
+  }
+  // Itens que não são objeto (null, número) são lixo: ignora.
+  return data.filter((x) => x !== null && typeof x === "object");
+}
+
+/** Todos os jogadores da lista de pros. Registros sem ID ou sem nick são pulados. */
+export async function getProPlayers(): Promise<ProPlayer[]> {
+  const list = await requestList("/proPlayers");
+  const out: ProPlayer[] = [];
+  const seen = new Set<number>(); // ID repetido no mesmo lote faria o upsert falhar
+  for (const p of list) {
+    const name = text(p.name);
+    if (!positiveInt(p.account_id) || !name || seen.has(p.account_id)) continue;
+    seen.add(p.account_id);
+    out.push({
+      account_id: p.account_id,
+      name,
+      personaname: text(p.personaname),
+      avatar: text(p.avatarmedium),
+      team_id: positiveInt(p.team_id) ? p.team_id : null,
+      team_name: text(p.team_name),
+      team_tag: text(p.team_tag),
+      verified: p.is_locked === true,
+      last_match_time: isoDate(p.last_match_time),
+    });
+  }
+  return out;
+}
+
+/** Os times da OpenDota (vêm ordenados por rating). */
+export async function getTeams(): Promise<ProTeam[]> {
+  const list = await requestList("/teams");
+  const out: ProTeam[] = [];
+  const seen = new Set<number>();
+  for (const t of list) {
+    if (!positiveInt(t.team_id) || typeof t.rating !== "number" || seen.has(t.team_id)) continue;
+    seen.add(t.team_id);
+    out.push({
+      team_id: t.team_id,
+      name: text(t.name) ?? `Time ${t.team_id}`,
+      tag: text(t.tag),
+      logo_url: text(t.logo_url),
+      rating: t.rating,
+      last_match_time: unixSeconds(t.last_match_time),
+    });
+  }
+  return out;
+}
+
+/** Todos que já jogaram pelo time; quem filtra o elenco atual é lib/pros.ts. */
+export async function getTeamPlayers(teamId: number): Promise<TeamMember[]> {
+  const data = await request<unknown>(`/teams/${teamId}/players`);
+  if (!Array.isArray(data)) return []; // 404 ou corpo estranho: sem elenco
+  const out: TeamMember[] = [];
+  for (const m of data as Record<string, unknown>[]) {
+    if (!m || !positiveInt(m.account_id)) continue;
+    out.push({
+      account_id: m.account_id,
+      name: text(m.name),
+      games_played: typeof m.games_played === "number" ? m.games_played : 0,
+      is_current_team_member:
+        typeof m.is_current_team_member === "boolean" ? m.is_current_team_member : null,
+    });
+  }
+  return out;
 }

@@ -3,6 +3,14 @@ export function isWin(playerSlot: number, radiantWin: boolean): boolean {
   return playerSlot < 128 === radiantWin;
 }
 
+/**
+ * Nome na tela de uma unidade extra que carrega itens (campo unitname da
+ * OpenDota). Hoje só existe o urso do Lone Druid; outra unidade cai em "Unidade".
+ */
+export function unitLabel(unitName: string): string {
+  return unitName === "spirit_bear" ? "Urso" : "Unidade";
+}
+
 /** Lado em que o jogador estava. */
 export function getSide(playerSlot: number): "Radiant" | "Dire" {
   return playerSlot < 128 ? "Radiant" : "Dire";

@@ -38,14 +38,14 @@ describe("routeFor", () => {
     expect(routeFor("/player/1", true, 105248644)).toBeNull();
   });
 
-  it.each(["/", "/player/1", "/match/2", "/auth/steam", "/auth/steam/callback", "/auth/error"])(
+  it.each(["/", "/player/1", "/match/2", "/auth/steam", "/auth/steam/callback", "/auth/error", "/pros", "/pros/search", "/pros/example", "/pros/refresh"])(
     "deslogado em %s não redireciona",
     (path) => {
       expect(routeFor(path, false, null)).toBeNull();
     },
   );
 
-  it.each(["/protected", "/qualquer", "/login", "/players-falso"])(
+  it.each(["/protected", "/qualquer", "/login", "/players-falso", "/prosx"])(
     "deslogado em %s redireciona para /",
     (path) => {
       expect(routeFor(path, false, null)).toBe("/");

@@ -272,14 +272,14 @@ describe("getMatchData", () => {
   const detail = { match_id: 100, start_time: 1000, duration: 1800, players: [] };
 
   it("detail salvo na versão atual: não chama a OpenDota", async () => {
-    reads.matches = { data: { detail: { version: 2, match: detail } }, error: null };
+    reads.matches = { data: { detail: { version: 3, match: detail } }, error: null };
 
     await expect(getMatchData(100)).resolves.toEqual(detail);
     expect(api.getMatch).not.toHaveBeenCalled();
   });
 
   it("detail de versão antiga: busca de novo e grava com a versão atual", async () => {
-    reads.matches = { data: { detail: { version: 1, match: {} } }, error: null };
+    reads.matches = { data: { detail: { version: 2, match: {} } }, error: null };
     api.getMatch.mockResolvedValue(detail as never);
 
     await expect(getMatchData(100)).resolves.toEqual(detail);
@@ -289,7 +289,7 @@ describe("getMatchData", () => {
     expect(writes[0].table).toBe("matches");
     expect(writes[0].rows).toMatchObject({
       match_id: 100,
-      detail: { version: 2, match: detail },
+      detail: { version: 3, match: detail },
     });
   });
 

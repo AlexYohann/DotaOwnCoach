@@ -145,6 +145,23 @@ export function TeamTables({
                           </span>
                           <ItemRow items={p.neutral} size="sm" />
                         </span>
+                        {/* Lone Druid: os itens do urso numa segunda linha. */}
+                        {/* O rótulo fica em cima, não ao lado: ao lado a linha
+                            passava da largura da tabela e criava rolagem. */}
+                        {p.units.map((u, i) => (
+                          <span key={i} className="block">
+                            <span className="mt-1.5 block text-[10px] uppercase leading-none tracking-wide text-muted-foreground">
+                              {u.label}
+                            </span>
+                            <span className="mt-1 flex items-center gap-3">
+                              <ItemRow items={u.items} size="sm" />
+                              <span className="opacity-70">
+                                <ItemRow items={u.backpack} size="xs" />
+                              </span>
+                              <ItemRow items={u.neutral} size="sm" />
+                            </span>
+                          </span>
+                        ))}
                       </td>
                     </PlayerRow>
                   ))}
@@ -174,6 +191,16 @@ export function TeamTables({
                       </td>
                       <td className="overflow-hidden">
                         <ItemRow items={[...p.items, ...p.neutral]} />
+                        {p.units.map((u, i) => (
+                          <span key={i} className="block">
+                            <span className="mt-1.5 block text-[10px] uppercase leading-none tracking-wide text-muted-foreground">
+                              {u.label}
+                            </span>
+                            <span className="mt-1 block">
+                              <ItemRow items={[...u.items, ...u.neutral]} />
+                            </span>
+                          </span>
+                        ))}
                       </td>
                     </PlayerRow>
                   ))}

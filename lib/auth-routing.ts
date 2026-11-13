@@ -3,7 +3,9 @@
 const MAX_ACCOUNT_ID = 4294967295; // 2^32 - 1
 // Rotas abertas sem login: "/" exato e estes prefixos (por segmento:
 // "/player/1" sim, "/players-falso" não).
-const PUBLIC_PREFIXES = ["/auth", "/player", "/match"];
+// "/pros" cobre a página, a busca, o exemplo e o cron (/pros/refresh, que
+// não tem sessão e é protegido pelo CRON_SECRET).
+const PUBLIC_PREFIXES = ["/auth", "/player", "/match", "/pros"];
 
 /**
  * account_id da conta Steam, vindo das claims do JWT. Só app_metadata

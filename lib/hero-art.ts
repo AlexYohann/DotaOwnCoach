@@ -62,6 +62,12 @@ export function rarityColor(rarity: string): string {
 // mesmo com "reduzir movimento" no sistema), com botão de pausar salvo no navegador.
 export type HeroMotion = "playing" | "paused";
 const MOTION_KEY = "dota-own-coach:hero-motion";
+/**
+ * Evento de window disparado quando a preferência muda (v2.1): o botão do
+ * banner e o menu da conta ficam em sincronia sem recarregar. O `detail` leva
+ * o novo valor, para funcionar mesmo com o armazenamento bloqueado.
+ */
+export const HERO_MOTION_EVENT = "dota-own-coach:hero-motion";
 type PrefStorage = Pick<Storage, "getItem" | "setItem">;
 
 /** Preferência salva; nada salvo, valor estranho ou armazenamento bloqueado → "playing". */
