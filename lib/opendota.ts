@@ -138,6 +138,27 @@ async function request<T>(path: string, timeoutMs = TIMEOUT_MS): Promise<T | nul
   }
 }
 
+/**
+ * Pede à OpenDota para buscar de novo o perfil da conta na Steam (nome e
+ * avatar). Ela não renova sozinha com frequência. Use com parcimônia: cada
+ * pedido também a faz reprocessar o histórico da conta. Lança OpenDotaError.
+ */
+export async function requestPlayerRefresh(accountId: number): Promise<void> {
+  const path = `/players/${accountId}/refresh`;
+  console.info(`[OpenDota] POST ${path}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new OpenDotaError("unavailable", `Falha ao chamar ${path}: ${err}`);
+  }
+  if (res.status === 429) throw new OpenDotaError("rate_limit", `429 em ${path}`);
+  if (!res.ok) throw new OpenDotaError("unavailable", `HTTP ${res.status} em ${path}`);
+}
+
 /** null = jogador não existe na OpenDota. */
 export async function getPlayer(
   accountId: number,

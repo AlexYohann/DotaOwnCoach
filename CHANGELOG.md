@@ -16,6 +16,8 @@ Cada versão tem uma tag git `vX.Y.Z`.
 ### Corrigido
 - **Lone Druid aparecia sem itens.** Quem carrega os itens é o urso, e a OpenDota os manda num campo separado (`additional_units`) que o site não lia. Agora a tela da partida mostra os itens do urso no painel do herói e numa segunda linha nas tabelas dos times. Partidas já salvas são buscadas de novo (`DETAIL_VERSION` 3).
 
+- **Nome e avatar antigos depois de trocar na Steam.** A OpenDota guarda uma cópia do perfil e não a renova sozinha com frequência, então o site mostrava o nome antigo por dias. Agora, quando você abre as próprias partidas logado, o site pede a renovação à OpenDota (no máximo uma vez por dia, depois de a página responder) e grava o nome e o avatar novos; eles aparecem na visita seguinte. Para jogadores que não estão logados o nome ainda pode atrasar (`lib/profile-refresh.ts`, coluna `profiles.profile_refreshed_at`).
+
 ### Alterado
 - "Sair" encerra a sessão só neste aparelho (antes desconectava todos os navegadores da conta).
 - A caixa de busca do cabeçalho aceita texto (antes só número) e ficou um pouco mais larga.
@@ -27,7 +29,7 @@ Cada versão tem uma tag git `vX.Y.Z`.
 - Regras puras em `lib/pros.ts` (normalização de nick em qualquer alfabeto, times em destaque, "jogou há X", destino do Enter); dados em `lib/pros-data.ts`.
 - A preferência de animação avisa a mudança por um evento (`HERO_MOTION_EVENT`): menu e banner ficam em sincronia sem recarregar.
 - Revisão final (antes do merge): (1) `search_pros` confere o texto ela mesma (2 a 32 caracteres, sem `%`, `_` ou barra invertida) — a função é chamável direto com a chave pública, e um texto enorme fazia o banco calcular semelhança contra a tabela inteira (migração `20261112010000_v2_1_search_pros_guard.sql`); (2) elenco vazio ou nenhum time ativo vindos da OpenDota com HTTP 200 são recusados em vez de apagar os cartões bons; (3) data malformada ou ID repetido num registro não derrubam mais a renovação inteira.
-- 246 testes (Vitest). Tempos aquecidos em `next start`: `/player` ~0,09–0,15 s, `/match` ~0,08 s, `/pros` na mesma faixa.
+- 254 testes (Vitest). Tempos aquecidos em `next start`: `/player` ~0,09–0,15 s, `/match` ~0,08 s, `/pros` na mesma faixa.
 
 ## [2.0.0] — 2026-11-10
 

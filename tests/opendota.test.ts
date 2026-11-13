@@ -12,6 +12,7 @@ import {
   getPlayer,
   getRecentMatches,
   OpenDotaError,
+  requestPlayerRefresh,
 } from "@/lib/opendota";
 
 const fetchMock = vi.fn();
@@ -376,6 +377,23 @@ describe("getTeams", () => {
     const err = await getTeams().catch((e) => e);
     expect(err).toBeInstanceOf(OpenDotaError);
     expect(err.kind).toBe("unavailable");
+  });
+});
+
+describe("requestPlayerRefresh", () => {
+  it("faz POST no endereço de renovação da conta", async () => {
+    fetchMock.mockResolvedValue(json({}));
+    await expect(requestPlayerRefresh(217152877)).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.opendota.com/api/players/217152877/refresh");
+    expect(init.method).toBe("POST");
+  });
+
+  it("429 lança rate_limit; 500 lança unavailable", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 429 }));
+    expect((await requestPlayerRefresh(1).catch((e) => e)).kind).toBe("rate_limit");
+    fetchMock.mockResolvedValue(new Response("", { status: 500 }));
+    expect((await requestPlayerRefresh(1).catch((e) => e)).kind).toBe("unavailable");
   });
 });
 

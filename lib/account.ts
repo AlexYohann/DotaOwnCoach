@@ -22,18 +22,26 @@ export function toHeaderAccount(
 }
 
 /**
+ * account_id de quem está vendo a página, ou null (deslogado). Vem do JWT
+ * (app_metadata), sem consulta ao banco. Lê o cookie de sessão: quem chama
+ * precisa estar dentro de <Suspense>. Nunca lança.
+ */
+export async function getViewerAccountId(): Promise<number | null> {
+  try {
+    const { data } = await (await createClient()).auth.getClaims();
+    return accountIdFromClaims(data?.claims);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Conta logada para o cabeçalho, ou null (deslogado). Nome e avatar vêm do
  * banco (players), NUNCA da OpenDota: o cabeçalho aparece em toda página.
  * Cookie inválido (ex.: usuário apagado) conta como deslogado.
  */
 export async function getHeaderAccount(): Promise<HeaderAccount | null> {
-  let accountId: number | null = null;
-  try {
-    const { data } = await (await createClient()).auth.getClaims();
-    accountId = accountIdFromClaims(data?.claims);
-  } catch {
-    return null;
-  }
+  const accountId = await getViewerAccountId();
   if (accountId === null) return null;
 
   const { data, error } = await createReadClient()

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { after } from "next/server";
 import { Suspense } from "react";
 import { HeaderAccountSlot } from "@/components/header-account";
 import { HeroBanner } from "@/components/hero-banner";
@@ -13,6 +14,7 @@ import {
   StatusMessage,
 } from "@/components/status-message";
 import { Button } from "@/components/ui/button";
+import { getViewerAccountId } from "@/lib/account";
 import { getHeroes, getPlayerData, type PlayerData } from "@/lib/data";
 import { heroKey } from "@/lib/hero-art";
 import {
@@ -24,6 +26,7 @@ import {
 } from "@/lib/match";
 import type { Hero, RecentMatch } from "@/lib/opendota";
 import { formatDecimal, mostPlayed, type MostPlayed } from "@/lib/player-summary";
+import { refreshOwnProfile } from "@/lib/profile-refresh";
 import { getVerifiedPro } from "@/lib/pros-data";
 import { steamProfileUrl, toAccountId } from "@/lib/steam";
 import { cn } from "@/lib/utils";
@@ -81,14 +84,16 @@ async function PlayerContent({
   let player: PlayerData | null;
   let heroes: Record<number, Hero>;
   let pro: Awaited<ReturnType<typeof getVerifiedPro>>;
+  let viewerId: number | null;
   try {
     // Banco primeiro (10 min), OpenDota se vencido — ver lib/data.ts.
     // getHeroes nunca lança: se falhar, devolve {} e a tabela mostra o hero_id.
     // getVerifiedPro também nunca lança e sai em paralelo: não soma tempo.
-    [player, heroes, pro] = await Promise.all([
+    [player, heroes, pro, viewerId] = await Promise.all([
       getPlayerData(accountId),
       getHeroes(),
       getVerifiedPro(accountId),
+      getViewerAccountId(),
     ]);
   } catch (err) {
     return (
@@ -96,6 +101,13 @@ async function PlayerContent({
         <OpenDotaErrorMessage error={err} />
       </PageShell>
     );
+  }
+
+  // Logado vendo as PRÓPRIAS partidas: pede à OpenDota o nome e o avatar
+  // atuais da Steam, no máximo uma vez por dia e depois da resposta (a OpenDota
+  // não renova o perfil sozinha — quem trocava de nome ficava com o antigo).
+  if (viewerId === accountId) {
+    after(() => refreshOwnProfile(accountId));
   }
 
   if (!player) {
