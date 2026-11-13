@@ -1,6 +1,6 @@
 # v2.2 — Linha do tempo do herói: design
 
-Data: 2026-11-13 · Status: **aguardando aprovação do Alex**. Mockup de referência (não versionado, interativo, com dados reais): `.superpowers/brainstorm/20765-1794585467/content/linha-do-tempo.html` — escolhida a opção **B**.
+Data: 2026-11-13 · Status: **aprovado pelo Alex** em 2026-11-13, com uma mudança dele já incorporada (a linha do tempo é só para quem está logado). Mockup de referência (não versionado, interativo, com dados reais): `.superpowers/brainstorm/20765-1794585467/content/linha-do-tempo.html` — escolhida a opção **B**.
 
 Legenda: **[Alex]** = decidido por ele no brainstorm. **[minha escolha]** = decisão minha, que ele pode derrubar ao ler.
 
@@ -18,6 +18,7 @@ O site é um "coach". Hoje a tela da partida mostra só o resultado final: GPM, 
 4. **Ícone do item** como marcador, não o nome [Alex].
 5. **"Fechados até aqui"**: os ícones dos itens grandes já fechados no minuto escolhido [Alex aceitou no lugar do inventário exato].
 6. **Pedir o processamento da partida sozinho** quando alguém abre uma partida ainda não processada, e **avisar na própria tela** quando ficar pronto [Alex].
+7. **Só para quem está logado** [Alex: "para dar um certo valor a mais aos usuários que usam o site"]. Deslogado, no lugar da linha do tempo aparece um convite curto com o botão "Entrar com a Steam".
 
 ## Não-objetivos
 
@@ -45,7 +46,12 @@ O site é um "coach". Hoje a tela da partida mostra só o resultado final: GPM, 
 
 - Por jogador, em partida processada: `gold_t[]` e `xp_t[]` (acumulado, um valor por minuto, índice 0 = minuto 0) e `purchase_log[]` (`{ time, key }`, `time` em segundos, negativo antes do sino; inclui componentes, receitas e consumíveis). `version != null` na partida = processada.
 - Conferência à mão na partida `9070527945`, Anti-Mage do Yatoro (47 min): Battle Fury aos 12:36; no minuto 16, ritmo de ouro 785, GPM até ali 523, ritmo de XP 1.019, XPM até ali 516. O GPM final calculado por `gold_t` (1133 numa outra partida) difere um pouco do `gold_per_min` da API (1091): os números da linha do tempo vêm só de `gold_t`/`xp_t` e não precisam bater com o GPM final do cabeçalho.
-- `POST /request/{match_id}` pede o processamento; "conta como 10 chamadas" (texto da própria API). `GET /request/{jobId}` devolve o estado do pedido. Em 2026-11-08 um pedido levou segundos. **Não medido:** o formato exato das duas respostas e até que idade de partida o pedido funciona (o replay some da Valve depois de algumas semanas) — ver "A medir antes de implementar".
+- `POST /request/{match_id}` pede o processamento; "conta como 10 chamadas" (texto da própria API). **Medido em 2026-11-13 em duas partidas do Alex** (com o ok dele):
+  - `POST` → 200 `{"job":{"jobId":639527695}}`.
+  - `GET /request/{jobId}` → enquanto processa, um objeto (`{"id":…,"type":"parse","attempts":1,"data":{"match_id":…},…}`); **quando termina, `null`** (HTTP 200).
+  - Tempo: 22 s (partida de 1,8 dia) e 36 s (partida de 8,2 dias). Depois disso as duas tinham `version`, `gold_t` e `purchase_log`.
+  - A partida pode aparecer processada alguns segundos **antes** de o pedido virar `null` (aconteceu na segunda).
+  - **Não medido:** partida com mais de 8 dias (não havia nenhuma não processada mais antiga) e o que a OpenDota responde quando o replay não existe mais.
 - Das 20 partidas recentes do Alex, 3 estavam processadas. Partidas de profissionais quase sempre estão.
 
 ## Como funciona
@@ -69,21 +75,25 @@ O site é um "coach". Hoje a tela da partida mostra só o resultado final: GPM, 
 
 ### 3. Processamento sob demanda
 
-Coluna nova em `matches`: `parse_requested_at timestamptz` (quando o site pediu o processamento; `null` = nunca pediu). RLS não muda: `matches` continua com leitura pública e nenhuma política de escrita; a coluna nova não revela nada sensível.
+Colunas novas em `matches`: `parse_requested_at timestamptz` (quando o site pediu o processamento; `null` = nunca pediu) e `parse_job_id bigint` (o `jobId` devolvido pela OpenDota). Não se guarda **quem** pediu: `matches` tem leitura pública, e isso revelaria quem abriu qual partida. RLS não muda: `matches` continua com leitura pública e nenhuma política de escrita; a coluna nova não revela nada sensível.
 
 Rota `app/match/[id]/parse/route.ts` (pública, como `/match`):
+
+As duas chamadas exigem login (`getViewerAccountId()`); sem sessão, 401 `{ status: "login" }` sem tocar em nada.
 
 - **`POST`** — chamada pela tela quando a partida aberta não está processada. Faz, nesta ordem, e para no primeiro "não":
   1. a partida existe no nosso banco com detalhe não processado (ou seja, alguém abriu a página; ninguém pede processamento de um ID qualquer);
   2. a partida é recente o bastante (limite de idade: ver "A medir");
   3. **reserva**: `UPDATE matches SET parse_requested_at = now() WHERE match_id = … AND parse_requested_at IS NULL` — só passa uma vez por partida, mesmo com duas abas;
   4. **teto diário**: no máximo **50 pedidos em 24 h** no site inteiro [minha escolha]. Conta do pior caso: cada partida custa 10 chamadas do pedido + até 12 consultas de acompanhamento = 22; 50 × 22 = 1.100 das ~3.000 chamadas diárias, sobrando folga para o resto do site. A contagem usa `parse_requested_at`.
-  5. `POST /request/{match_id}` na OpenDota.
+  5. `POST /request/{match_id}` na OpenDota; grava o `jobId` em `parse_job_id`.
   Resposta: `{ status: "requested" | "already" | "too_old" | "limit" | "unavailable" }`. Se o passo 5 falhar, a reserva **fica** (não tenta de novo sozinho) [minha escolha: protege o limite; custo: aquela partida fica sem linha do tempo].
-- **`GET`** — a tela consulta a cada 8 s, no máximo 12 vezes (~1 min e meio), enquanto mostra "Analisando o replay…". O servidor busca a partida na OpenDota; se voltou processada, **grava o detalhe novo antes de responder** (aqui não é `after()`: a tela vai ler o banco em seguida) e responde `{ status: "ready" }`; senão `{ status: "pending" }`. Só consulta a OpenDota para partidas com `parse_requested_at` preenchido há menos de 10 minutos; fora disso, `{ status: "expired" }` sem chamar a OpenDota.
+- **`GET`** — a tela consulta a cada 8 s, no máximo 12 vezes (~1 min e meio), enquanto mostra "Analisando o replay…". O servidor consulta `GET /request/{jobId}` (resposta pequena; a partida inteira tem ~280 KB): objeto → `{ status: "pending" }`; `null` → busca a partida uma vez; se voltou processada, **grava o detalhe novo antes de responder** (aqui não é `after()`: a tela vai ler o banco em seguida) e responde `{ status: "ready" }`; se o pedido terminou e a partida continua sem processar, `{ status: "failed" }` (replay inexistente ou falha da OpenDota). Só consulta a OpenDota para partidas com `parse_requested_at` preenchido há menos de 10 minutos; fora disso, `{ status: "expired" }` sem chamar a OpenDota.
 - Quando chega `ready`, a tela chama `router.refresh()` e a linha do tempo aparece sem recarregar.
 - `POST` que responde `already` com pedido feito há menos de 10 minutos (outra aba, ou a página recarregada): a tela acompanha do mesmo jeito. `already` com pedido antigo: mensagem "Não foi possível analisar esta partida", sem consultar.
-- Qualquer visitante dispara o pedido, logado ou não [minha escolha]; quem protege o limite são a reserva, a idade e o teto.
+- Só quem está logado dispara o pedido [Alex]. Além do login, protegem o limite a reserva, a idade e o teto. Teto por usuário fica para depois, se o teto geral se mostrar pouco [minha escolha].
+
+**Só para logados, de verdade** [minha escolha de como cumprir a decisão do Alex]: a página da partida lê quem está vendo (`getViewerAccountId()`, junto das outras leituras, sem somar tempo). Deslogado, o servidor **não envia** os dados da linha do tempo para o navegador (`timeline` sai como `null` para todos os jogadores) e a tela mostra o convite. Não é só esconder com CSS.
 
 O que a pessoa vê no lugar da linha do tempo:
 
@@ -94,6 +104,9 @@ O que a pessoa vê no lugar da linha do tempo:
 | partida antiga | "Linha do tempo indisponível: o replay desta partida não existe mais." |
 | teto diário | "Muitas análises pedidas hoje. Tente de novo amanhã." |
 | pedido já feito antes e não processou | "Não foi possível analisar esta partida." |
+| deslogado (qualquer partida) | "Linha do tempo: veja como o herói evoluiu minuto a minuto e quanto cada item acelerou o farm." + botão "Entrar com a Steam" (`<a href="/auth/steam">`, sem prefetch) |
+
+Depois do login a pessoa cai nas próprias partidas, como hoje; voltar para a partida em que estava fica para depois.
 
 ### 4. A tela (`components/match-timeline.tsx`, cliente; dentro do painel do herói em `match-view.tsx`)
 
@@ -143,7 +156,8 @@ Dentro da 2, dois layouts no mockup: **A** dois gráficos empilhados (ouro e XP)
 - `lib/timeline.ts`: ritmo e média nos minutos 0, 1, 2, 3 e no último; os números da partida `9070527945` no minuto 16; item grande (limite de 2.000, montado, receitas e consumíveis fora, compra antes do minuto 0 fora); antes → depois no fim da partida; fileiras dos ícones.
 - `lib/opendota.ts`: partida processada → `parsed` e `timeline`; não processada → `timeline: null`; campos estranhos não derrubam; `POST /request`.
 - `lib/data.ts`: detalhe processado não busca de novo; detalhe não processado é servido do banco sem buscar; versão antiga busca de novo.
-- Rota de processamento: cada uma das cinco guardas (partida desconhecida, antiga, já pedida, teto, falha da OpenDota); duas chamadas simultâneas → um pedido só; `GET` fora da janela não chama a OpenDota.
+- Rota de processamento: sem login → 401 e nenhuma chamada; cada uma das cinco guardas (partida desconhecida, antiga, já pedida, teto, falha da OpenDota); duas chamadas simultâneas → um pedido só; `GET`: pendente, pronto (grava antes de responder), terminou sem processar, fora da janela (não chama a OpenDota).
+- Página da partida: deslogado → nenhum jogador sai com `timeline` preenchida.
 
 ## Pronto quando
 
@@ -154,22 +168,17 @@ Dentro da 2, dois layouts no mockup: **A** dois gráficos empilhados (ouro e XP)
 5. Tempo de `/match` aquecido igual ao da v2.1 (~0,1–0,4 s), medido em `next start`.
 6. Celular (390 px) sem rolagem lateral; a barra funciona pelo teclado.
 7. Com o teto diário em 0 (em teste), aparece a mensagem do teto e nenhum `POST`.
+8. Deslogado, a mesma partida mostra o convite com "Entrar com a Steam", o HTML/dados da página não trazem `gold`/`xp` por minuto, e a rota de processamento responde 401.
 
 ## Entrega
 
 Branch `v2.2`, preview conferido pelo Alex antes do merge, versão `2.2.0` (`package.json`, `CHANGELOG.md`, tag). README (roteiro renumerado) e `CLAUDE.md` atualizados. Migração aplicada pelo MCP, com o `.sql` em `supabase/migrations/`.
 
-## A medir antes de implementar
+## Ainda não medido
 
-Precisa de 2 ou 3 pedidos reais de processamento em partidas do Alex (cada um pesa 10 chamadas), com o ok dele:
-
-1. O formato das respostas de `POST /request/{id}` e `GET /request/{jobId}`.
-2. Quanto tempo leva hoje.
-3. **Até que idade de partida funciona.** Define o limite de idade da guarda 2. Enquanto não for medido, o padrão é **14 dias** [minha escolha, chute a confirmar].
+**Até que idade de partida o processamento funciona.** Funcionou com 8,2 dias; não havia partida não processada mais antiga para testar. O limite de idade da guarda 2 fica em **14 dias** [minha escolha, chute]. Se o chute estiver alto, o custo é um pedido desperdiçado por partida antiga (a reserva impede repetir) e a mensagem "Não foi possível analisar"; se estiver baixo, partidas que poderiam ser analisadas ficam sem linha do tempo. O valor fica numa constante só, fácil de ajustar quando houver um caso real.
 
 ## Fica para quem implementa
 
-- Se o `GET` da rota consulta `GET /request/{jobId}` (mais leve) ou a própria partida, conforme o que a medição mostrar.
-- Onde guardar o `jobId`, se for usado.
 - Detalhes de desenho do SVG, do tooltip e da quebra em telas estreitas, seguindo o mockup.
 - Se a seção fica recolhível no painel.
