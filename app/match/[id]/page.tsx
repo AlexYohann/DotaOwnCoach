@@ -12,6 +12,7 @@ import {
   OpenDotaErrorMessage,
   StatusMessage,
 } from "@/components/status-message";
+import { getViewerAccountId } from "@/lib/account";
 import { heroKey } from "@/lib/hero-art";
 import { formatDuration, formatStartTime, unitLabel } from "@/lib/match";
 import { getHeroes, getMatchData } from "@/lib/data";
@@ -22,6 +23,11 @@ import {
   type MatchDetail,
 } from "@/lib/opendota";
 import { toAccountId } from "@/lib/steam";
+import {
+  timelineState,
+  toViewTimeline,
+  type ItemInfo,
+} from "@/lib/timeline";
 
 type Params = Promise<{ id: string }>;
 type SearchParams = Promise<{ player?: string | string[] }>;
@@ -83,12 +89,15 @@ async function MatchContent({
   let match: MatchDetail | null;
   let heroes: Record<number, Hero>;
   let items: Record<number, Item>;
+  let viewerId: number | null;
   try {
     // getHeroes/getItems nunca lançam: se falharem, a página mostra os IDs.
-    [match, heroes, items] = await Promise.all([
+    // getViewerAccountId lê o cookie e nunca lança; sai junto, sem somar tempo.
+    [match, heroes, items, viewerId] = await Promise.all([
       getMatchData(Number(id)), // banco primeiro; partida salva nunca é rebuscada
       getHeroes(),
       getItems(),
+      getViewerAccountId(),
     ]);
   } catch (err) {
     return (
@@ -128,6 +137,14 @@ async function MatchContent({
     );
   };
 
+  // Linha do tempo (v2.2): só para quem está logado. Deslogado, os dados por
+  // minuto NÃO vão para o navegador — não é só esconder na tela.
+  const timeline = timelineState(viewerId, match.parsed ?? false);
+  const itemsByKey: Record<string, ItemInfo> = {};
+  for (const it of Object.values(items)) {
+    itemsByKey[it.key] = { key: it.key, name: it.name, img: it.img, cost: it.cost, assembled: it.assembled };
+  }
+
   const players: ViewPlayer[] = match.players.map((p) => ({
     slot: p.player_slot,
     isRadiant: p.player_slot < 128,
@@ -159,6 +176,7 @@ async function MatchContent({
       neutral: u.neutral.map(resolveItem),
     })),
     cosmetics: p.cosmetics ?? [], // detail antigo (v1) sem o campo: lista vazia
+    timeline: timeline === "ready" ? toViewTimeline(p.timeline ?? null, itemsByKey) : null,
   }));
 
   // "Voltar às partidas de <nome>" quando o jogador buscado está na partida.
@@ -177,6 +195,11 @@ async function MatchContent({
   };
 
   return (
-    <MatchView summary={summary} players={players} account={<HeaderAccountSlot />} />
+    <MatchView
+      summary={summary}
+      players={players}
+      timelineState={timeline}
+      account={<HeaderAccountSlot />}
+    />
   );
 }

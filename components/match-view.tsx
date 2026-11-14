@@ -12,6 +12,7 @@ import { TeamTables } from "@/components/team-tables";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { rarityColor } from "@/lib/hero-art";
 import type { Cosmetic } from "@/lib/opendota"; // só o tipo
+import type { TimelineState, ViewTimeline } from "@/lib/timeline";
 
 export type { ViewItem };
 
@@ -46,6 +47,8 @@ export type ViewPlayer = {
     neutral: (ViewItem | null)[];
   }[];
   cosmetics: Cosmetic[];
+  /** Linha do tempo (v2.2). null = deslogado, partida não processada ou sem dados deste jogador. */
+  timeline: ViewTimeline | null;
 };
 
 /** Resumo da partida, já formatado no servidor. */
@@ -69,6 +72,7 @@ export function MatchView({
 }: {
   summary: MatchSummary;
   players: ViewPlayer[];
+  timelineState: TimelineState;
   account: React.ReactNode; // HeaderAccountSlot (componente de servidor) vindo da página
 }) {
   const [selectedSlot, setSelectedSlot] = useState(
