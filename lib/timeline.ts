@@ -137,3 +137,23 @@ export function timelineState(viewerId: number | null, parsed: boolean): Timelin
   if (viewerId === null) return "login";
   return parsed ? "ready" : "unparsed";
 }
+
+// A linha do tempo começa recolhida (pedido do Alex: a tela ficava poluída) e
+// lembra a escolha no navegador. Armazenamento bloqueado nunca derruba a tela.
+const OPEN_KEY = "dota-own-coach:timeline-open";
+
+export function readTimelineOpen(storage: Pick<Storage, "getItem"> | null): boolean {
+  try {
+    return storage?.getItem(OPEN_KEY) === "open";
+  } catch {
+    return false;
+  }
+}
+
+export function saveTimelineOpen(storage: Pick<Storage, "setItem"> | null, open: boolean): void {
+  try {
+    storage?.setItem(OPEN_KEY, open ? "open" : "closed");
+  } catch {
+    // sem armazenamento: vale só nesta visita
+  }
+}

@@ -9,6 +9,8 @@ import {
   markerRows,
   minuteTicks,
   purchaseMinute,
+  readTimelineOpen,
+  saveTimelineOpen,
   rhythm,
   timelineState,
   toViewTimeline,
@@ -167,5 +169,35 @@ describe("timelineState (só para quem está logado)", () => {
   it("logado: pronta ou ainda não processada", () => {
     expect(timelineState(7, true)).toBe("ready");
     expect(timelineState(7, false)).toBe("unparsed");
+  });
+});
+
+describe("readTimelineOpen / saveTimelineOpen (lembrar se a pessoa abriu)", () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
+  };
+  const broken = {
+    getItem: () => {
+      throw new Error("SecurityError");
+    },
+    setItem: () => {
+      throw new Error("QuotaExceededError");
+    },
+  };
+
+  it("começa fechada; guarda e lê a escolha", () => {
+    const s = mem();
+    expect(readTimelineOpen(s)).toBe(false);
+    saveTimelineOpen(s, true);
+    expect(readTimelineOpen(s)).toBe(true);
+    saveTimelineOpen(s, false);
+    expect(readTimelineOpen(s)).toBe(false);
+  });
+
+  it("armazenamento bloqueado ou ausente: fechada, sem erro", () => {
+    expect(readTimelineOpen(broken)).toBe(false);
+    expect(() => saveTimelineOpen(broken, true)).not.toThrow();
+    expect(readTimelineOpen(null)).toBe(false);
   });
 });
