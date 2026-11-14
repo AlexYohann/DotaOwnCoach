@@ -5,7 +5,10 @@ vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 
 import {
   getHeroesFromApi,
+  getItems,
   getMatch,
+  getParseJob,
+  requestParse,
   getProPlayers,
   getTeamPlayers,
   getTeams,
@@ -377,6 +380,119 @@ describe("getTeams", () => {
     const err = await getTeams().catch((e) => e);
     expect(err).toBeInstanceOf(OpenDotaError);
     expect(err.kind).toBe("unavailable");
+  });
+});
+
+// v2.2: linha do tempo do herói.
+describe("getMatch — dados minuto a minuto", () => {
+  const LOG = [
+    { time: -90, key: "tango" },
+    { time: 266, key: "recipe_power_treads" }, // receita: fora
+    { time: 266, key: "power_treads" },
+    { time: "x", key: "bfury" }, // tempo torto: fora
+    { key: "yasha" }, // sem tempo: fora
+    null, // lixo
+  ];
+  const player = (over: Record<string, unknown> = {}) => ({
+    player_slot: 0,
+    hero_id: 1,
+    gold_t: [0, 170, 559],
+    xp_t: [14, 14, 261],
+    purchase_log: LOG,
+    ...over,
+  });
+
+  it("partida processada: parsed e timeline sem receitas nem entradas tortas", async () => {
+    fetchMock.mockResolvedValue(json({ match_id: 1, version: 22, players: [player()] }));
+    const m = (await getMatch(1))!;
+    expect(m.parsed).toBe(true);
+    expect(m.players[0].timeline).toEqual({
+      gold: [0, 170, 559],
+      xp: [14, 14, 261],
+      purchases: [
+        { time: -90, key: "tango" },
+        { time: 266, key: "power_treads" },
+      ],
+    });
+  });
+
+  it("partida não processada: parsed false e timeline null, mesmo com os campos", async () => {
+    fetchMock.mockResolvedValue(json({ match_id: 1, version: null, players: [player()] }));
+    const m = (await getMatch(1))!;
+    expect(m.parsed).toBe(false);
+    expect(m.players[0].timeline).toBeNull();
+
+    fetchMock.mockResolvedValue(json({ match_id: 1, players: [player()] }));
+    expect((await getMatch(1))!.parsed).toBe(false);
+  });
+
+  it("dados estranhos num jogador: só ele fica sem linha do tempo", async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        match_id: 1,
+        version: 22,
+        players: [
+          player({ xp_t: [14, 14] }), // tamanhos diferentes
+          player({ gold_t: [0, null, 300] }), // null no meio
+          player({ gold_t: [0], xp_t: [14] }), // 1 ponto só
+          player({ purchase_log: undefined }), // sem compras
+          player({ gold_t: "lixo" }),
+          player(), // bom
+        ],
+      }),
+    );
+    const t = (await getMatch(1))!.players.map((p) => p.timeline);
+    expect(t.slice(0, 3)).toEqual([null, null, null]);
+    expect(t[3]).toEqual({ gold: [0, 170, 559], xp: [14, 14, 261], purchases: [] });
+    expect(t[4]).toBeNull();
+    expect(t[5]?.gold).toEqual([0, 170, 559]);
+  });
+});
+
+describe("getItems — chave e se é montado", () => {
+  it("guarda a chave do item e se ele tem componentes", async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        bfury: { id: 145, dname: "Battle Fury", img: "/apps/dota2/images/items/bfury.png", cost: 3900, components: ["broadsword", "claymore"] },
+        claymore: { id: 149, dname: "Claymore", img: "/apps/dota2/images/items/claymore.png", cost: 1350, components: null },
+      }),
+    );
+    const items = await getItems();
+    expect(items[145]).toMatchObject({ key: "bfury", assembled: true, cost: 3900 });
+    expect(items[149]).toMatchObject({ key: "claymore", assembled: false });
+  });
+});
+
+describe("requestParse / getParseJob", () => {
+  it("POST no pedido de processamento e devolve o jobId", async () => {
+    fetchMock.mockResolvedValue(json({ job: { jobId: 639527695 } }));
+    await expect(requestParse(99)).resolves.toBe(639527695);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.opendota.com/api/request/99");
+    expect(init.method).toBe("POST");
+  });
+
+  it("resposta sem jobId numérico: unavailable; 429: rate_limit", async () => {
+    fetchMock.mockResolvedValue(json({ job: {} }));
+    expect((await requestParse(1).catch((e) => e)).kind).toBe("unavailable");
+    fetchMock.mockResolvedValue(new Response("", { status: 429 }));
+    expect((await requestParse(1).catch((e) => e)).kind).toBe("rate_limit");
+  });
+
+  it("estado do pedido: null = terminou; objeto = em andamento", async () => {
+    fetchMock.mockResolvedValue(json(null));
+    await expect(getParseJob(5)).resolves.toBe("done");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.opendota.com/api/request/5");
+
+    fetchMock.mockResolvedValue(json({ id: 5, type: "parse", attempts: 1 }));
+    await expect(getParseJob(5)).resolves.toBe("pending");
+  });
+
+  it("404 = pedido que a OpenDota já esqueceu (terminou); 500 lança", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 404 }));
+    await expect(getParseJob(5)).resolves.toBe("done");
+    fetchMock.mockResolvedValue(new Response("", { status: 500 }));
+    expect((await getParseJob(5).catch((e) => e)).kind).toBe("unavailable");
   });
 });
 

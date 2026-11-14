@@ -1,5 +1,6 @@
 import "server-only";
 import { cacheLife } from "next/cache";
+import type { Purchase, Timeline } from "@/lib/timeline";
 
 const BASE_URL = "https://api.opendota.com/api";
 const TIMEOUT_MS = 8000;
@@ -39,8 +40,10 @@ export type ItemAbility = { type: string; title: string; description: string };
 /** Item resolvido: nome, imagem e o que ele faz (para o preview no hover). */
 export type Item = {
   id: number;
+  key: string; // chave em /constants/items, ex.: "bfury" (é o que o purchase_log usa)
   name: string;
   img: string;
+  assembled: boolean; // tem componentes (v2.2: decide o que é "item grande")
   cost: number | null; // null = sem custo (neutros, encantamentos)
   stats: string[]; // ex.: "+ 25 Strength"
   abilities: ItemAbility[];
@@ -85,6 +88,9 @@ export type MatchPlayer = {
   neutral: number[]; // item_neutral + item_neutral2 (encantamento)
   units: MatchUnit[]; // additional_units: no Lone Druid os itens ficam no urso
   cosmetics: Cosmetic[];
+  // v2.2: ouro/XP acumulados por minuto e compras. null = partida não
+  // processada pela OpenDota, ou dados estranhos deste jogador.
+  timeline: Timeline | null;
 };
 
 export type MatchDetail = {
@@ -94,6 +100,7 @@ export type MatchDetail = {
   radiant_win: boolean | null;
   radiant_score: number;
   dire_score: number;
+  parsed: boolean; // processada pela OpenDota (replay analisado): tem os dados por minuto
   players: MatchPlayer[];
 };
 
@@ -136,6 +143,53 @@ async function request<T>(path: string, timeoutMs = TIMEOUT_MS): Promise<T | nul
   } catch {
     throw new OpenDotaError("unavailable", `JSON inválido em ${path}`);
   }
+}
+
+// v2.2: processamento do replay de uma partida (é o que gera os dados por
+// minuto). fetch direto, como requestPlayerRefresh: aqui o corpo null e o 404
+// têm significado próprio.
+async function rawCall(path: string, method: "GET" | "POST"): Promise<Response> {
+  console.info(`[OpenDota] ${method} ${path}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { method, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  } catch (err) {
+    throw new OpenDotaError("unavailable", `Falha ao chamar ${path}: ${err}`);
+  }
+  if (res.status === 429) throw new OpenDotaError("rate_limit", `429 em ${path}`);
+  return res;
+}
+
+/**
+ * Pede o processamento da partida. Pesa como 10 chamadas no limite da
+ * OpenDota: quem decide se pode pedir é lib/match-parse.ts. Devolve o jobId.
+ */
+export async function requestParse(matchId: number): Promise<number> {
+  const path = `/request/${matchId}`;
+  const res = await rawCall(path, "POST");
+  if (!res.ok) throw new OpenDotaError("unavailable", `HTTP ${res.status} em ${path}`);
+  const body = (await res.json().catch(() => null)) as { job?: { jobId?: unknown } } | null;
+  const jobId = body?.job?.jobId;
+  if (typeof jobId !== "number" || !Number.isInteger(jobId)) {
+    throw new OpenDotaError("unavailable", `${path} sem jobId`);
+  }
+  return jobId;
+}
+
+/**
+ * Estado de um pedido de processamento. A OpenDota devolve o pedido enquanto
+ * ele está na fila e null quando terminou (medido em 2026-11-13); 404 = já
+ * esqueceu o pedido, o que também quer dizer que terminou.
+ */
+export async function getParseJob(jobId: number): Promise<"pending" | "done"> {
+  const path = `/request/${jobId}`;
+  const res = await rawCall(path, "GET");
+  if (res.status === 404) return "done";
+  if (!res.ok) throw new OpenDotaError("unavailable", `HTTP ${res.status} em ${path}`);
+  const body = await res.json().catch(() => {
+    throw new OpenDotaError("unavailable", `JSON inválido em ${path}`);
+  });
+  return body === null ? "done" : "pending";
 }
 
 /**
@@ -205,6 +259,7 @@ type RawItem = {
   abilities?: ItemAbility[];
   cd?: number | false;
   mc?: number | false;
+  components?: string[] | null;
 };
 
 // Número > 0 ou null (a OpenDota usa false/0 para "não tem").
@@ -224,7 +279,9 @@ async function fetchItems(): Promise<Record<number, Item>> {
     items[it.id] = {
       id: it.id,
       name: it.dname ?? key,
+      key,
       img: cdnUrl(it.img),
+      assembled: Array.isArray(it.components) && it.components.length > 0,
       cost: positive(it.cost),
       // Só atributos com "display" são bônus visíveis; os outros são internos.
       stats: (it.attrib ?? [])
@@ -252,9 +309,12 @@ export async function getItems(): Promise<Record<number, Item>> {
   }
 }
 
-type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral" | "units"> &
+type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral" | "units" | "timeline"> &
   Record<string, unknown>;
-type RawMatch = Omit<MatchDetail, "players"> & { players?: RawMatchPlayer[] };
+type RawMatch = Omit<MatchDetail, "players" | "parsed"> & {
+  players?: RawMatchPlayer[];
+  version?: number | null; // != null = processada
+};
 
 type RawCosmetic = { name?: string; item_rarity?: string | null; image_path?: string | null };
 
@@ -292,13 +352,41 @@ function toUnits(raw: unknown): MatchUnit[] {
     }));
 }
 
+const isNumberList = (v: unknown): v is number[] =>
+  Array.isArray(v) && v.every((x) => typeof x === "number" && Number.isFinite(x));
+
+/**
+ * Dados por minuto de um jogador (só em partida processada). Ouro e XP têm de
+ * ser listas de números do mesmo tamanho, com pelo menos 2 minutos; senão,
+ * null — só este jogador fica sem linha do tempo. Compras: sem receitas
+ * (recipe_*), sem entradas tortas.
+ */
+function toTimeline(p: RawMatchPlayer): Timeline | null {
+  const gold = p.gold_t, xp = p.xp_t;
+  if (!isNumberList(gold) || !isNumberList(xp)) return null;
+  if (gold.length < 2 || gold.length !== xp.length) return null;
+  const purchases: Purchase[] = [];
+  if (Array.isArray(p.purchase_log)) {
+    for (const e of p.purchase_log as unknown[]) {
+      if (!e || typeof e !== "object") continue;
+      const { time, key } = e as { time?: unknown; key?: unknown };
+      if (typeof time !== "number" || !Number.isFinite(time)) continue;
+      if (typeof key !== "string" || !key || key.startsWith("recipe_")) continue;
+      purchases.push({ time, key });
+    }
+  }
+  return { gold, xp, purchases };
+}
+
 function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
+  const parsed = data.version !== null && data.version !== undefined;
 
   return {
     match_id: data.match_id,
     start_time: data.start_time,
     duration: data.duration,
     radiant_win: data.radiant_win ?? null,
+    parsed,
     radiant_score: data.radiant_score,
     dire_score: data.dire_score,
     // Copia só os campos usados: o JSON original tem ~280 KB.
@@ -324,6 +412,7 @@ function toMatchDetail(data: RawMatch, players: RawMatchPlayer[]): MatchDetail {
       neutral: slots(p, NEUTRAL_KEYS),
       units: toUnits(p.additional_units),
       cosmetics: toCosmetics(p.cosmetics),
+      timeline: parsed ? toTimeline(p) : null,
     })),
   };
 }
