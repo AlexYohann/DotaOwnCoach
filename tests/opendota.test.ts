@@ -5,7 +5,7 @@ vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 
 import {
   getHeroesFromApi,
-  getItems,
+  getItemsFromApi,
   getMatch,
   getParseJob,
   requestParse,
@@ -449,7 +449,12 @@ describe("getMatch — dados minuto a minuto", () => {
   });
 });
 
-describe("getItems — chave e se é montado", () => {
+describe("getItemsFromApi — chave e se é montado", () => {
+  it("lista que não é objeto: lança unavailable (quem decide o que fazer é lib/data.ts)", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 404 }));
+    expect((await getItemsFromApi().catch((e) => e)).kind).toBe("unavailable");
+  });
+
   it("guarda a chave do item e se ele tem componentes", async () => {
     fetchMock.mockResolvedValue(
       json({
@@ -457,7 +462,7 @@ describe("getItems — chave e se é montado", () => {
         claymore: { id: 149, dname: "Claymore", img: "/apps/dota2/images/items/claymore.png", cost: 1350, components: null },
       }),
     );
-    const items = await getItems();
+    const items = await getItemsFromApi();
     expect(items[145]).toMatchObject({ key: "bfury", assembled: true, cost: 3900 });
     expect(items[149]).toMatchObject({ key: "claymore", assembled: false });
   });

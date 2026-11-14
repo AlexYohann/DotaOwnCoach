@@ -15,9 +15,8 @@ import {
 import { getViewerAccountId } from "@/lib/account";
 import { heroKey } from "@/lib/hero-art";
 import { formatDuration, formatStartTime, unitLabel } from "@/lib/match";
-import { getHeroes, getMatchData } from "@/lib/data";
+import { getHeroes, getItems, getMatchData } from "@/lib/data";
 import {
-  getItems,
   type Hero,
   type Item,
   type MatchDetail,

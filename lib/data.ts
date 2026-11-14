@@ -3,11 +3,13 @@ import { after } from "next/server";
 import { createAdminClient, createReadClient } from "@/lib/supabase/admin";
 import {
   getHeroesFromApi,
+  getItemsFromApi,
   getMatch,
   getPlayer,
   getRecentMatches,
   OpenDotaError,
   type Hero,
+  type Item,
   type MatchDetail,
   type PlayerProfile,
   type RecentMatch,
@@ -18,6 +20,7 @@ import {
 
 const PLAYER_TTL_MS = 10 * 60 * 1000; // perfil + partidas recentes: 10 min
 const HEROES_TTL_MS = 24 * 60 * 60 * 1000; // heróis: 1 dia
+const ITEMS_TTL_MS = 24 * 60 * 60 * 1000; // itens: 1 dia
 // Versão do formato de matches.detail. Se o formato mudar (ex.: linha do tempo
 // da v5), sobe este número e as partidas antigas são buscadas de novo.
 // v2.2: + parsed e dados por minuto. Detalhe não processado continua sendo
@@ -294,6 +297,41 @@ export async function getHeroes(): Promise<Record<number, Hero>> {
   } catch (err) {
     console.error(err);
     return toHeroMap(saved); // lista antiga é melhor que nenhuma
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Itens (v2.2.1). Antes ficavam num "use cache" de 1 dia em lib/opendota.ts,
+// mas na Vercel esse cache não era reaproveitado: toda partida aberta baixava
+// /constants/items de novo (~0,2–0,3 s e 1 chamada do limite da OpenDota).
+// Agora o mapa inteiro fica numa linha só de items_cache, renovada por dia.
+
+type ItemsRow = { items: Record<number, Item>; updated_at: string };
+
+/** Mapa item_id → Item. Nunca lança: sem nada salvo e OpenDota fora → {} (itens viram "#id"). */
+export async function getItems(): Promise<Record<number, Item>> {
+  const { data, error } = await createReadClient()
+    .from("items_cache")
+    .select("items, updated_at")
+    .eq("id", true)
+    .maybeSingle<ItemsRow>();
+  if (error) logDb("ler items_cache", error);
+  if (data && isFresh(data.updated_at, ITEMS_TTL_MS)) return data.items;
+
+  try {
+    const items = await getItemsFromApi();
+    after(async () => {
+      const admin = createAdminClient();
+      if (!admin) return;
+      const { error: e } = await admin
+        .from("items_cache")
+        .upsert({ id: true, items, updated_at: new Date().toISOString() });
+      if (e) logDb("gravar items_cache", e);
+    });
+    return items;
+  } catch (err) {
+    console.error(err);
+    return data?.items ?? {}; // lista antiga é melhor que nenhuma
   }
 }
 
