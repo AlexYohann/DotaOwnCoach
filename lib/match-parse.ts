@@ -69,10 +69,12 @@ export async function requestMatchParse(
   const admin = createAdminClient();
   if (!admin) return "unavailable";
 
-  // Só partida que alguém abriu (o detalhe está salvo): ninguém pede
-  // processamento de um ID qualquer.
+  // Só partida que o site conhece (a linha existe: veio da lista de partidas
+  // de algum jogador ou de uma visita): ninguém pede processamento de um ID
+  // qualquer. O detalhe pode ainda não estar salvo — a página grava em
+  // after() e este pedido pode chegar antes.
   const row = await readRow(admin, matchId);
-  if (!row || !row.detail) return "unknown";
+  if (!row) return "unknown";
   if (isParsed(row)) return "ready";
   if (row.parse_requested_at) return row.parse_job_id ? "pending" : "failed";
 
@@ -125,7 +127,7 @@ export async function checkMatchParse(
   if (!admin) return "unknown";
 
   const row = await readRow(admin, matchId);
-  if (!row || !row.detail || !row.parse_requested_at) return "unknown";
+  if (!row || !row.parse_requested_at) return "unknown";
   if (isParsed(row)) return "ready";
   if (!row.parse_job_id) return "failed";
 

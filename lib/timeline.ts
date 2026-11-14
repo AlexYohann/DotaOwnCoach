@@ -97,6 +97,18 @@ export function markerRows(xs: number[], minGap: number): (0 | 1)[] {
   });
 }
 
+const TICK_STEPS = [5, 10, 15, 20, 30];
+const TICK_MIN_PX = 56; // largura de "15 min" com folga
+
+/** Minutos com rótulo no eixo: o menor passo que não sobrepõe os rótulos. */
+export function minuteTicks(lastMinute: number, plotWidth: number): number[] {
+  const perMinute = plotWidth / Math.max(1, lastMinute);
+  const step = TICK_STEPS.find((s) => s * perMinute >= TICK_MIN_PX) ?? TICK_STEPS[TICK_STEPS.length - 1];
+  const out: number[] = [];
+  for (let m = 0; m <= Math.max(0, lastMinute); m += step) out.push(m);
+  return out;
+}
+
 /** Minuto inicial: o do primeiro item grande; sem item, o 10 (ou o último). */
 export function defaultMinute(big: BigPurchase[], lastMinute: number): number {
   if (big.length > 0) return clampMinute(Math.round(big[0].time / 60), lastMinute);

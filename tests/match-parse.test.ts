@@ -89,12 +89,18 @@ beforeEach(() => {
 });
 
 describe("requestMatchParse", () => {
-  it("partida que o site não conhece (sem linha ou sem detalhe): unknown, sem OpenDota", async () => {
+  it("partida que o site não conhece (sem linha): unknown, sem OpenDota", async () => {
     row = null;
     await expect(requestMatchParse(100, NOW)).resolves.toBe("unknown");
-    row = { match_id: 100, start_time: iso(NOW), detail: null, parse_requested_at: null, parse_job_id: null };
-    await expect(requestMatchParse(100, NOW)).resolves.toBe("unknown");
     expect(api.requestParse).not.toHaveBeenCalled();
+  });
+
+  // Corrida: a página grava o detalhe em after(), e o pedido da tela pode
+  // chegar antes. A linha já existe (veio da lista de partidas do jogador).
+  it("linha sem detalhe ainda (gravação em andamento): pede normalmente", async () => {
+    row!.detail = null;
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("requested");
+    expect(api.requestParse).toHaveBeenCalledTimes(1);
   });
 
   it("já processada: ready, sem OpenDota", async () => {
@@ -172,6 +178,11 @@ describe("checkMatchParse", () => {
     row = null;
     await expect(checkMatchParse(100, NOW)).resolves.toBe("unknown");
     expect(api.getParseJob).not.toHaveBeenCalled();
+  });
+
+  it("pedido feito antes de o detalhe ser gravado: acompanha normalmente", async () => {
+    row!.detail = null;
+    await expect(checkMatchParse(100, NOW)).resolves.toBe("pending");
   });
 
   it("ainda na fila: pending, nada gravado", async () => {

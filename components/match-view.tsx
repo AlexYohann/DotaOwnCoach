@@ -8,11 +8,13 @@ import { ItemList, type ViewItem } from "@/components/match-items";
 import { ResultText, SideText } from "@/components/result-text";
 import { SiteHeader } from "@/components/site-header";
 import { MatchTip } from "@/components/match-tip";
+import { MatchTimeline } from "@/components/match-timeline";
+import { MatchTimelineGate } from "@/components/match-timeline-gate";
 import { TeamTables } from "@/components/team-tables";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { rarityColor } from "@/lib/hero-art";
 import type { Cosmetic } from "@/lib/opendota"; // só o tipo
-import type { TimelineState, ViewTimeline } from "@/lib/timeline";
+import { clampMinute, defaultMinute, type TimelineState, type ViewTimeline } from "@/lib/timeline";
 
 export type { ViewItem };
 
@@ -68,6 +70,7 @@ const LABEL = "text-[10px] font-semibold uppercase tracking-[.12em] text-ember";
 export function MatchView({
   summary,
   players,
+  timelineState,
   account,
 }: {
   summary: MatchSummary;
@@ -79,6 +82,10 @@ export function MatchView({
     (players.find((p) => p.isSearched) ?? players[0])?.slot,
   );
   const selected = players.find((p) => p.slot === selectedSlot);
+  // Minuto da linha do tempo. null = a pessoa ainda não mexeu (começa no 1º
+  // item grande). Trocar de herói NÃO zera: dá para ver o carry inimigo no
+  // mesmo minuto.
+  const [minute, setMinute] = useState<number | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
   // O painel fica no cabeçalho; ao escolher um herói nas tabelas, sobe até
@@ -135,7 +142,31 @@ export function MatchView({
               {summary.direScore}
             </span>
           </p>
-          {selected && <PlayerPanel player={selected} />}
+          {selected && (
+            <PlayerPanel
+              player={selected}
+              timeline={
+                timelineState === "ready" ? (
+                  selected.timeline ? (
+                    <MatchTimeline
+                      timeline={selected.timeline}
+                      minute={clampMinute(
+                        minute ?? defaultMinute(selected.timeline.big, selected.timeline.gold.length - 1),
+                        selected.timeline.gold.length - 1,
+                      )}
+                      onMinuteChange={(m) => setMinute(m)}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sem dados minuto a minuto para este jogador.</p>
+                  )
+                ) : (
+                  // Mesmo lugar na árvore ao trocar de herói: não remonta (senão
+                  // cada troca faria um novo pedido de processamento).
+                  <MatchTimelineGate matchId={summary.matchId} state={timelineState} />
+                )
+              }
+            />
+          )}
         </HeroBanner>
       </div>
 
@@ -152,7 +183,7 @@ export function MatchView({
   );
 }
 
-function PlayerPanel({ player: p }: { player: ViewPlayer }) {
+function PlayerPanel({ player: p, timeline }: { player: ViewPlayer; timeline: React.ReactNode }) {
   const fmt = (n: number | null) =>
     n === null ? "—" : n.toLocaleString("pt-BR");
   const stats: [string, string][] = [
@@ -190,6 +221,10 @@ function PlayerPanel({ player: p }: { player: ViewPlayer }) {
           </div>
         ))}
       </dl>
+
+      {/* aria-live="off": arrastar a barra não deve ser lido a cada minuto
+          (o painel inteiro é uma região "polite") */}
+      <div aria-live="off">{timeline}</div>
 
       <div className="flex flex-col gap-2 text-sm">
         <ItemList label="Itens" items={p.items} />

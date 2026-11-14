@@ -7,6 +7,7 @@ import {
   clampMinute,
   defaultMinute,
   markerRows,
+  minuteTicks,
   rhythm,
   timelineState,
   toViewTimeline,
@@ -103,6 +104,20 @@ describe("markerRows (ícones próximos sobem para a 2ª fileira)", () => {
   it("compara com o último ícone da fileira de baixo", () => {
     expect(markerRows([10, 100, 120, 300, 310, 320], 36)).toEqual([0, 0, 1, 0, 1, 1]);
     expect(markerRows([], 36)).toEqual([]);
+  });
+});
+
+describe("minuteTicks (rótulos do eixo dos minutos sem se sobrepor)", () => {
+  it("de 5 em 5 quando cabe; passo maior em tela estreita", () => {
+    expect(minuteTicks(47, 900)).toEqual([0, 5, 10, 15, 20, 25, 30, 35, 40, 45]); // ~96 px cada
+    // celular: de 5 em 5 dariam 34 px (sobrepõe); de 10 em 10, 69 px (≥ 56)
+    expect(minuteTicks(47, 323)).toEqual([0, 10, 20, 30, 40]);
+    expect(minuteTicks(90, 260)).toEqual([0, 20, 40, 60, 80]); // partida longa em tela estreita
+  });
+
+  it("partida curtíssima: só o 0 e nunca passo zero", () => {
+    expect(minuteTicks(1, 300)).toEqual([0]);
+    expect(minuteTicks(0, 300)).toEqual([0]);
   });
 });
 
