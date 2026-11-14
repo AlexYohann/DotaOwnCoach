@@ -4,7 +4,7 @@ Coach pessoal de Dota 2: acompanhe as próprias partidas, anote o que deu certo 
 
 > Projeto de fã, não afiliado à Valve. Dota 2 é marca registrada da Valve Corporation. Dados de partidas pela [OpenDota](https://www.opendota.com/).
 
-**Versão atual: v2.1.0** · no ar em https://dota-own-coach.vercel.app · histórico detalhado no [CHANGELOG](CHANGELOG.md)
+**Versão atual: v2.2.0** · no ar em https://dota-own-coach.vercel.app · histórico detalhado no [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -36,6 +36,7 @@ Cada versão tem uma tag git (`vX.Y.Z`) e uma entrada no [CHANGELOG](CHANGELOG.m
 | **v1.4.0** | Visual novo, só escuro: heróis animados oficiais da Valve, home estilo capa com link para o código de amigo da Steam, página do jogador com a última partida em destaque e o herói mais jogado, tela da partida com o herói selecionado ao fundo, cosméticos, times em dois modos (completo / lado a lado) e ordenação por coluna. |
 | **v2.0.0** | Entrar com a Steam (sem e-mail nem senha): logado, a capa leva direto às suas partidas. Cabeçalho com seu avatar e menu (Minhas partidas, Sair) e busca por ID em todas as páginas. Cartão do herói mais jogado com médias (K/D/A, KDA, % de vitórias, GPM, XPM, last hits). |
 | **v2.1.0** | Pro players: busca pelo nick no cabeçalho (tolera erro de digitação, separa os verificados dos homônimos), página `/pros` com os 6 times em destaque e o elenco inteiro, "Ver um exemplo" na capa, link do perfil na Steam, menu do avatar ampliado (código de amigo, animação, sair só deste aparelho). |
+| **v2.2.0** | Linha do tempo do herói (logado): barra de minutos sobre o gráfico do ritmo de ouro/XP com os ícones dos itens grandes; análise do replay pedida sozinha quando a partida ainda não foi processada. |
 
 As versões 1.1 e 1.2 foram além do plano original da v1 (a tela da partida estava prevista só para depois). Por isso o roteiro abaixo foi **renumerado a partir da v1.3**.
 
@@ -79,8 +80,12 @@ Dividida em 2026-11-10 (decisão do Alex): o login virou a parte arriscada e nã
   - Página `/pros` com os 6 times de maior rating que jogaram nos últimos 60 dias e o elenco atual inteiro. A lista é copiada para o banco uma vez por dia (cron da Vercel).
   - "Ver um exemplo" na capa, link do perfil na Steam, menu do avatar ampliado.
   - Pronto quando: digitar `yatorro` mostra o Yatoro da Team Spirit entre os verificados, e recarregar `/pros` não gera chamadas à OpenDota.
-- **v2.2: quem joga comigo.** As pessoas com quem você mais joga e como vocês se saem juntos (`/players/{id}/peers` da OpenDota). Não usa a lista de amigos da Steam, que exigiria chave da API e lista pública.
-- **v2.3: diário.**
+- [x] **v2.2: linha do tempo do herói.** Design: `docs/superpowers/specs/2026-11-13-v2-2-linha-do-tempo-design.md`.
+  - Na tela da partida, uma barra com o tempo da partida sobre o gráfico do ritmo de ouro/XP, com os ícones dos itens grandes na hora em que foram fechados. Para estudar quanto cada item acelerou o farm.
+  - Só para quem está logado. Partida ainda não processada pela OpenDota: o site pede a análise do replay e a linha do tempo aparece sozinha.
+  - Pronto quando: na partida 9070527945 (Anti-Mage), minuto 16 mostra ouro 785 / GPM 523 / XP 1.019 / XPM 516, e uma partida recente não processada ganha a linha do tempo sozinha.
+- **v2.3: quem joga comigo.** As pessoas com quem você mais joga e como vocês se saem juntos (`/players/{id}/peers` da OpenDota). Não usa a lista de amigos da Steam, que exigiria chave da API e lista pública.
+- **v2.4: diário.**
   - **Pré-requisito (feito em 2026-11-12): backup automático do banco**, em `.github/workflows/backup-db.yml`; ver "Como voltar uma versão". Motivo original: As notas são escritas pelos usuários e não existem em nenhum outro lugar. O plano gratuito do Supabase não garante backup: antes de abrir o diário, uma tarefa agendada (GitHub Actions) exporta o banco todo dia (`supabase db dump`) e guarda as últimas cópias fora do Supabase. Alternativa paga: plano Pro (7 dias de backups diários).
   - Tabela `match_notes`, com uma nota por partida: o que errou, o que fez bem e tags.
   - RLS privado: cada usuário só lê e edita as próprias notas.
@@ -117,7 +122,7 @@ Quem quiser deixa uma partida pública para outros jogadores avaliarem o que err
 - **Depois, se houver uso:** lista de partidas pedindo avaliação, categorias e reputação dos avaliadores.
 - **Riscos:**
   - **Começar sem avaliadores:** começar pela party e pelos amigos; a IA da v4 pode ser a primeira avaliadora.
-  - **Linha do tempo só em partida processada:** ela só existe em partidas que a OpenDota processou a partir do replay. Dá para pedir o processamento (`POST /request/{match_id}`; testado em 2026-11-08: uma partida comum foi processada em segundos e passou a ter `purchase_log`), mas só enquanto o replay existir, então o pedido precisa ser automático, logo após o jogo.
+  - **Linha do tempo só em partida processada:** ela só existe em partidas que a OpenDota processou a partir do replay. Dá para pedir o processamento (`POST /request/{match_id}`; testado em 2026-11-08: uma partida comum foi processada em segundos e passou a ter `purchase_log`), mas só enquanto o replay existir, então o pedido precisa ser automático, logo após o jogo. Desde a v2.2 o site já pede a análise ao abrir uma partida (logado, partidas de até 14 dias); falta pedir logo após o jogo, sem depender de uma visita.
   - **Comentários abusivos:** a moderação básica (só logado comenta, o dono apaga) entra desde o início.
 - **Pronto quando:** outra conta comenta um minuto específico da sua partida pública, e uma partida privada continua invisível para ela. Esse teste com duas contas é obrigatório.
 

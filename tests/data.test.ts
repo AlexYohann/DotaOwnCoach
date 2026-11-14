@@ -55,7 +55,7 @@ vi.mock("@/lib/opendota", async (importOriginal) => {
 vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 
 import * as od from "@/lib/opendota";
-import { getHeroes, getMatchData, getPlayerData } from "@/lib/data";
+import { getHeroes, getMatchData, getPlayerData, refreshMatchDetail } from "@/lib/data";
 
 const api = vi.mocked(od);
 
@@ -269,17 +269,17 @@ describe("getPlayerData", () => {
 });
 
 describe("getMatchData", () => {
-  const detail = { match_id: 100, start_time: 1000, duration: 1800, players: [] };
+  const detail = { match_id: 100, start_time: 1000, duration: 1800, parsed: true, players: [] };
 
   it("detail salvo na versão atual: não chama a OpenDota", async () => {
-    reads.matches = { data: { detail: { version: 3, match: detail } }, error: null };
+    reads.matches = { data: { detail: { version: 4, match: detail } }, error: null };
 
     await expect(getMatchData(100)).resolves.toEqual(detail);
     expect(api.getMatch).not.toHaveBeenCalled();
   });
 
   it("detail de versão antiga: busca de novo e grava com a versão atual", async () => {
-    reads.matches = { data: { detail: { version: 2, match: {} } }, error: null };
+    reads.matches = { data: { detail: { version: 3, match: {} } }, error: null };
     api.getMatch.mockResolvedValue(detail as never);
 
     await expect(getMatchData(100)).resolves.toEqual(detail);
@@ -289,7 +289,7 @@ describe("getMatchData", () => {
     expect(writes[0].table).toBe("matches");
     expect(writes[0].rows).toMatchObject({
       match_id: 100,
-      detail: { version: 3, match: detail },
+      detail: { version: 4, match: detail },
     });
   });
 
@@ -297,6 +297,33 @@ describe("getMatchData", () => {
     api.getMatch.mockResolvedValue(null);
     await expect(getMatchData(1)).resolves.toBeNull();
     expect(afterQueue).toHaveLength(0);
+  });
+
+  // v2.2: abrir a página nunca refaz a busca de uma partida não processada;
+  // quem busca de novo é o fluxo de processamento (refreshMatchDetail).
+  it("detail não processado na versão atual: servido do banco, sem OpenDota", async () => {
+    const unparsed = { ...detail, parsed: false };
+    reads.matches = { data: { detail: { version: 4, match: unparsed } }, error: null };
+    await expect(getMatchData(100)).resolves.toEqual(unparsed);
+    expect(api.getMatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("refreshMatchDetail", () => {
+  const detail = { match_id: 100, start_time: 1000, duration: 1800, parsed: true, players: [] };
+
+  it("busca na OpenDota e já gravou quando devolve (sem esperar after)", async () => {
+    api.getMatch.mockResolvedValue(detail as never);
+    await expect(refreshMatchDetail(100)).resolves.toEqual(detail);
+    expect(afterQueue).toHaveLength(0);
+    expect(writes[0].table).toBe("matches");
+    expect(writes[0].rows).toMatchObject({ match_id: 100, detail: { version: 4, match: detail } });
+  });
+
+  it("partida inexistente: null e nada gravado", async () => {
+    api.getMatch.mockResolvedValue(null);
+    await expect(refreshMatchDetail(1)).resolves.toBeNull();
+    expect(writes).toHaveLength(0);
   });
 });
 
