@@ -3,6 +3,15 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [2.2.1] — 2026-11-14
+
+### Corrigido
+- **Tela da partida mais rápida e menos chamadas à OpenDota.** A lista de itens tinha um cache de 1 dia que não funcionava na Vercel: toda partida aberta baixava a lista inteira (~340 KB) da OpenDota de novo, gastando ~0,2–0,3 s e uma chamada do limite gratuito por visita (já acontecia na v2.1, conferido no deploy antigo). Agora a lista fica no banco, como os heróis, e é renovada uma vez por dia.
+
+### Técnico
+- Tabela `items_cache` (migração `20261114000000_v2_2_1_items_cache.sql`): uma linha só com o mapa de itens; RLS com leitura pública e nenhuma política de escrita (só o servidor grava, com a secret key). `getItems` passou de `lib/opendota.ts` para `lib/data.ts`; `lib/opendota.ts` não usa mais `"use cache"`.
+- 317 testes (Vitest).
+
 ## [2.2.0] — 2026-11-14
 
 ### Adicionado

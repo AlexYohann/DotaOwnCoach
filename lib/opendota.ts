@@ -1,5 +1,4 @@
 import "server-only";
-import { cacheLife } from "next/cache";
 import type { Purchase, Timeline } from "@/lib/timeline";
 
 const BASE_URL = "https://api.opendota.com/api";
@@ -265,11 +264,12 @@ type RawItem = {
 // Número > 0 ou null (a OpenDota usa false/0 para "não tem").
 const positive = (v: unknown) => (typeof v === "number" && v > 0 ? v : null);
 
-// /constants/items tem ~340 KB; o cache guarda só os campos usados.
-async function fetchItems(): Promise<Record<number, Item>> {
-  "use cache";
-  cacheLife("days");
-
+/**
+ * Mapa item_id → Item direto da API (sem cache — quem guarda é lib/data.ts,
+ * no banco, por 1 dia). /constants/items tem ~340 KB; copia só os campos
+ * usados. Lança OpenDotaError.
+ */
+export async function getItemsFromApi(): Promise<Record<number, Item>> {
   const data = await request<Record<string, RawItem>>("/constants/items");
   if (!data) throw new OpenDotaError("unavailable", "constants/items vazio");
 
@@ -297,16 +297,6 @@ async function fetchItems(): Promise<Record<number, Item>> {
     };
   }
   return items;
-}
-
-/** Mapa item_id → Item. Se a OpenDota falhar, devolve {} (itens viram "#id"). */
-export async function getItems(): Promise<Record<number, Item>> {
-  try {
-    return await fetchItems();
-  } catch (err) {
-    console.error(err);
-    return {};
-  }
 }
 
 type RawMatchPlayer = Omit<MatchPlayer, "items" | "backpack" | "neutral" | "units" | "timeline"> &

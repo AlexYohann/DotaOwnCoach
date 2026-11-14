@@ -50,12 +50,13 @@ vi.mock("@/lib/opendota", async (importOriginal) => {
     getRecentMatches: vi.fn(),
     getMatch: vi.fn(),
     getHeroesFromApi: vi.fn(),
+    getItemsFromApi: vi.fn(),
   };
 });
 vi.mock("next/cache", () => ({ cacheLife: () => {} }));
 
 import * as od from "@/lib/opendota";
-import { getHeroes, getMatchData, getPlayerData, refreshMatchDetail } from "@/lib/data";
+import { getHeroes, getItems, getMatchData, getPlayerData, refreshMatchDetail } from "@/lib/data";
 
 const api = vi.mocked(od);
 
@@ -324,6 +325,40 @@ describe("refreshMatchDetail", () => {
     api.getMatch.mockResolvedValue(null);
     await expect(refreshMatchDetail(1)).resolves.toBeNull();
     expect(writes).toHaveLength(0);
+  });
+});
+
+// v2.2.1: a lista de itens ia na OpenDota a cada partida aberta em produção
+// (o "use cache" não era reaproveitado na Vercel). Agora fica no banco, 1 dia.
+describe("getItems", () => {
+  const ITEMS = { 145: { id: 145, key: "bfury", name: "Battle Fury" } };
+  const OLD = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+  it("salva há menos de 1 dia: vem do banco, sem OpenDota", async () => {
+    reads.items_cache = { data: { items: ITEMS, updated_at: NOW }, error: null };
+    await expect(getItems()).resolves.toEqual(ITEMS);
+    expect(api.getItemsFromApi).not.toHaveBeenCalled();
+  });
+
+  it("vencida: busca na OpenDota e grava depois da resposta", async () => {
+    reads.items_cache = { data: { items: {}, updated_at: OLD }, error: null };
+    api.getItemsFromApi.mockResolvedValue(ITEMS as never);
+    await expect(getItems()).resolves.toEqual(ITEMS);
+    expect(writes).toHaveLength(0);
+    await flushAfter();
+    expect(writes[0].table).toBe("items_cache");
+    expect(writes[0].rows).toMatchObject({ id: true, items: ITEMS });
+  });
+
+  it("OpenDota fora: usa a lista antiga em vez de quebrar", async () => {
+    reads.items_cache = { data: { items: ITEMS, updated_at: OLD }, error: null };
+    api.getItemsFromApi.mockRejectedValue(new od.OpenDotaError("unavailable", "x"));
+    await expect(getItems()).resolves.toEqual(ITEMS);
+  });
+
+  it("banco vazio e OpenDota fora: {} (itens viram #id), sem lançar", async () => {
+    api.getItemsFromApi.mockRejectedValue(new od.OpenDotaError("unavailable", "x"));
+    await expect(getItems()).resolves.toEqual({});
   });
 });
 
