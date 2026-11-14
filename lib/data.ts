@@ -20,7 +20,9 @@ const PLAYER_TTL_MS = 10 * 60 * 1000; // perfil + partidas recentes: 10 min
 const HEROES_TTL_MS = 24 * 60 * 60 * 1000; // heróis: 1 dia
 // Versão do formato de matches.detail. Se o formato mudar (ex.: linha do tempo
 // da v5), sobe este número e as partidas antigas são buscadas de novo.
-const DETAIL_VERSION = 3; // v1.4: + cosméticos; v2.1: + unidades extras (urso do Lone Druid)
+// v2.2: + parsed e dados por minuto. Detalhe não processado continua sendo
+// servido do banco; quem busca de novo é o processamento (refreshMatchDetail).
+const DETAIL_VERSION = 4; // v1.4: + cosméticos; v2.1: + unidades extras (urso do Lone Druid)
 
 /** De onde vieram os dados mostrados. */
 export type Freshness = {
@@ -228,6 +230,18 @@ export async function getMatchData(
   const match = await getMatch(matchId);
   if (!match) return null;
   after(() => saveMatchDetail(match));
+  return match;
+}
+
+/**
+ * Busca a partida de novo na OpenDota e GRAVA antes de devolver (não usa
+ * after): quem chama — o acompanhamento do processamento — vai pedir para a
+ * tela ler o banco logo em seguida. null = partida não existe.
+ */
+export async function refreshMatchDetail(matchId: number): Promise<MatchDetail | null> {
+  const match = await getMatch(matchId);
+  if (!match) return null;
+  await saveMatchDetail(match);
   return match;
 }
 
