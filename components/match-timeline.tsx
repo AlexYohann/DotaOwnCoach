@@ -7,6 +7,7 @@ import {
   beforeAfter,
   markerRows,
   minuteTicks,
+  purchaseMinute,
   rhythm,
   type BigPurchase,
   type ViewTimeline,
@@ -149,7 +150,7 @@ export function MatchTimeline({
                   onFocus={show}
                   onMouseLeave={() => setTip(null)}
                   onBlur={() => setTip(null)}
-                  onClick={() => onMinuteChange(Math.round(p.time / 60))}
+                  onClick={() => onMinuteChange(purchaseMinute(p.time))}
                   className={cn(
                     "absolute rounded-[3px] transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ember",
                     p.time > minute * 60 && "opacity-40 hover:opacity-100",

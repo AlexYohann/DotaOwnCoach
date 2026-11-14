@@ -12,6 +12,7 @@ type Row = {
 };
 let row: Row | null;
 let recentRequests: number; // pedidos nas últimas 24 h (o que o count devolve)
+let recentMinute: number; // pedidos no último minuto
 let adminEnabled: boolean;
 let updates: Record<string, unknown>[];
 
@@ -21,8 +22,12 @@ function builder() {
   const filters: ((r: Row) => boolean)[] = [];
   let payload: Record<string, unknown> | null = null;
   let isCount = false;
+  let since: string | null = null;
   const run = () => {
-    if (isCount) return { count: recentRequests, error: null, data: null };
+    if (isCount) {
+      const lastMinute = since !== null && NOW - Date.parse(since) <= 61_000;
+      return { count: lastMinute ? recentMinute : recentRequests, error: null, data: null };
+    }
     const hit = row && filters.every((f) => f(row!)) ? row : null;
     if (payload) {
       if (hit) {
@@ -41,7 +46,7 @@ function builder() {
     update: (p: Record<string, unknown>) => ((payload = p), b),
     eq: (col: keyof Row, v: unknown) => (filters.push((r) => r[col] === v), b),
     is: (col: keyof Row, v: null) => (filters.push((r) => r[col] === v), b),
-    gte: () => b,
+    gte: (_col: string, v: string) => ((since = v), b),
     maybeSingle: () => Promise.resolve(run()),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve(run()).then(resolve, reject),
@@ -80,6 +85,7 @@ beforeEach(() => {
     parse_job_id: null,
   };
   recentRequests = 0;
+  recentMinute = 0;
   adminEnabled = true;
   updates = [];
   api.requestParse.mockReset().mockResolvedValue(639527695);
@@ -145,7 +151,52 @@ describe("requestMatchParse", () => {
     await expect(requestMatchParse(100, NOW)).resolves.toBe("unavailable");
     expect(row!.parse_requested_at).toBe(iso(NOW));
     expect(row!.parse_job_id).toBeNull();
+    await expect(requestMatchParse(100, NOW + 60_000)).resolves.toBe("failed");
+    expect(api.requestParse).toHaveBeenCalledTimes(1);
+  });
+
+  // Revisão final, achado 2: outro pedido chega enquanto o primeiro espera a
+  // OpenDota (reserva feita, jobId ainda não gravado).
+  it("pedido concorrente na janela entre a reserva e o jobId: pending, não failed", async () => {
+    row!.parse_requested_at = iso(NOW - 5_000);
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("pending");
+    row!.parse_requested_at = iso(NOW - 60_000);
     await expect(requestMatchParse(100, NOW)).resolves.toBe("failed");
+    expect(api.requestParse).not.toHaveBeenCalled();
+  });
+
+  // Achado 3: o limite da OpenDota também é por minuto (60), e cada pedido
+  // pesa 10. Seis partidas abertas em sequência derrubariam o site.
+  it("3 pedidos no último minuto: busy, sem reservar; 2 passa", async () => {
+    recentMinute = 3;
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("busy");
+    expect(row!.parse_requested_at).toBeNull();
+    expect(api.requestParse).not.toHaveBeenCalled();
+    recentMinute = 2;
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("requested");
+  });
+
+  it("OpenDota responde 429: busy e a reserva é desfeita (a partida não perde a chance)", async () => {
+    api.requestParse.mockRejectedValue(new od.OpenDotaError("rate_limit", "429"));
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("busy");
+    expect(row!.parse_requested_at).toBeNull();
+    api.requestParse.mockResolvedValue(639527695);
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("requested");
+  });
+
+  // Achado 9: a OpenDota processa partidas de profissionais sozinha, minutos
+  // depois do fim. Conferir antes custa 1 chamada e economiza 9.
+  it("a OpenDota já processou sozinha: ready sem pedir de novo", async () => {
+    refresh.mockResolvedValue({ parsed: true } as never);
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("ready");
+    expect(refresh).toHaveBeenCalledWith(100);
+    expect(api.requestParse).not.toHaveBeenCalled();
+    expect(row!.parse_job_id).toBeNull();
+  });
+
+  it("a conferência prévia falha (OpenDota fora): pede assim mesmo", async () => {
+    refresh.mockRejectedValue(new od.OpenDotaError("unavailable", "timeout"));
+    await expect(requestMatchParse(100, NOW)).resolves.toBe("requested");
     expect(api.requestParse).toHaveBeenCalledTimes(1);
   });
 
@@ -167,7 +218,7 @@ describe("requestMatchParse", () => {
 
 describe("checkMatchParse", () => {
   beforeEach(() => {
-    row!.parse_requested_at = iso(NOW - 30_000);
+    row!.parse_requested_at = iso(NOW - 60_000);
     row!.parse_job_id = 639527695;
   });
 
@@ -217,10 +268,28 @@ describe("checkMatchParse", () => {
     expect(row!.parse_job_id).toBe(639527695);
   });
 
-  it("em andamento há mais de 1 dia: failed sem chamar a OpenDota", async () => {
+  // Achado 1: quem fechou a aba antes de terminar e volta dias depois não
+  // pode ver "falhou" se a OpenDota processou. Busca a partida uma vez só.
+  it("em andamento há mais de 1 dia: busca a partida uma vez e resolve", async () => {
     row!.parse_requested_at = iso(NOW - DAY - 1000);
+    refresh.mockResolvedValue({ parsed: true } as never);
+    await expect(checkMatchParse(100, NOW)).resolves.toBe("ready");
+    expect(row!.parse_job_id).toBeNull();
+    expect(api.getParseJob).not.toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("em andamento há mais de 1 dia e não processada: failed", async () => {
+    row!.parse_requested_at = iso(NOW - DAY - 1000);
+    refresh.mockResolvedValue({ parsed: false } as never);
     await expect(checkMatchParse(100, NOW)).resolves.toBe("failed");
     expect(row!.parse_job_id).toBeNull();
+  });
+
+  it("reserva recente ainda sem jobId: pending, sem chamar a OpenDota", async () => {
+    row!.parse_requested_at = iso(NOW - 10_000);
+    row!.parse_job_id = null;
+    await expect(checkMatchParse(100, NOW)).resolves.toBe("pending");
     expect(api.getParseJob).not.toHaveBeenCalled();
   });
 

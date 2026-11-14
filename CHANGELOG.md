@@ -13,9 +13,10 @@ Cada versão tem uma tag git `vX.Y.Z`.
 
 ### Técnico
 - Regras em `lib/timeline.ts` (ritmo, média, item grande, eixo, rótulos dos minutos); dados por minuto (`gold_t`, `xp_t`, `purchase_log`) em `MatchPlayer.timeline`, só em partida processada (`MatchDetail.parsed`). `DETAIL_VERSION` 4: as partidas salvas são buscadas de novo uma vez.
-- Pedido de análise em `lib/match-parse.ts` + rota `/match/[id]/parse` (`POST` pede, `GET` acompanha; exige login). Cada pedido pesa como 10 chamadas no limite gratuito da OpenDota, por isso: um pedido por partida (trava no banco, à prova de duas abas), só partidas de até 14 dias, no máximo 50 pedidos por dia no site inteiro. Colunas `matches.parse_requested_at` e `matches.parse_job_id` (migração `20261113000000_v2_2_match_parse.sql`; RLS sem mudança).
+- Pedido de análise em `lib/match-parse.ts` + rota `/match/[id]/parse` (`POST` pede, `GET` acompanha; exige login). Cada pedido pesa como 10 chamadas no limite gratuito da OpenDota, por isso: um pedido por partida (trava no banco, à prova de duas abas), só partidas de até 14 dias, no máximo 3 pedidos por minuto e 50 por dia no site inteiro. Antes de pedir, o site confere se a OpenDota já processou a partida sozinha (comum em partidas de profissionais). Colunas `matches.parse_requested_at` e `matches.parse_job_id` (migração `20261113000000_v2_2_match_parse.sql`; RLS sem mudança).
 - Gráfico em SVG desenhado à mão, sem biblioteca nova; cores conferidas contra o fundo do painel.
-- 302 testes (Vitest). Tempo da tela da partida aquecida igual ao da v2.1 (~0,07–0,1 s em `next start`, logado e deslogado).
+- Revisão final (antes do merge): quem fechava a aba antes de a análise terminar e voltava dias depois via "Não foi possível analisar" mesmo com a partida processada; uma segunda aba aberta no meio do pedido também; seis partidas abertas em sequência podiam esgotar o limite por minuto da OpenDota (um 429 queimava a chance da partida); o minuto inicial podia mostrar o primeiro item como ainda não fechado. Todos corrigidos com teste.
+- 310 testes (Vitest). Tempo da tela da partida aquecida igual ao da v2.1 (~0,07–0,1 s em `next start`, logado e deslogado).
 
 ## [2.1.0] — 2026-11-12
 

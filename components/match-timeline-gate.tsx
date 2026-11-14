@@ -16,10 +16,11 @@ const TEXT = {
   slow: "A análise ainda não terminou. Volte daqui a pouco: quando ficar pronta, a linha do tempo aparece aqui.",
   tooOld: "Linha do tempo indisponível: o replay desta partida não existe mais.",
   limit: "Muitas análises pedidas hoje. Tente de novo amanhã.",
+  busy: "Muitas análises pedidas agora. Recarregue a página daqui a um minuto.",
   failed: "Não foi possível analisar esta partida.",
 } as const;
 
-type View = "login" | "starting" | "analyzing" | "slow" | "tooOld" | "limit" | "failed";
+type View = "login" | "starting" | "analyzing" | "slow" | "tooOld" | "limit" | "busy" | "failed";
 
 export function MatchTimelineGate({ matchId, state }: { matchId: number; state: "login" | "unparsed" }) {
   const router = useRouter();
@@ -82,6 +83,8 @@ export function MatchTimelineGate({ matchId, state }: { matchId: number; state: 
           return setView("tooOld");
         case "limit":
           return setView("limit");
+        case "busy": // teto por minuto (limite da OpenDota): nada foi gasto
+          return setView("busy");
         default: // failed, unavailable, unknown, erro de rede
           return setView("failed");
       }

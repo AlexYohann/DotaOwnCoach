@@ -109,9 +109,14 @@ export function minuteTicks(lastMinute: number, plotWidth: number): number[] {
   return out;
 }
 
+/** Primeiro minuto em que o item já aparece como fechado (12:20 → 13). */
+export function purchaseMinute(timeSeconds: number): number {
+  return Math.ceil(timeSeconds / 60);
+}
+
 /** Minuto inicial: o do primeiro item grande; sem item, o 10 (ou o último). */
 export function defaultMinute(big: BigPurchase[], lastMinute: number): number {
-  if (big.length > 0) return clampMinute(Math.round(big[0].time / 60), lastMinute);
+  if (big.length > 0) return clampMinute(purchaseMinute(big[0].time), lastMinute);
   return Math.min(10, lastMinute);
 }
 

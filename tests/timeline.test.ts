@@ -8,6 +8,7 @@ import {
   defaultMinute,
   markerRows,
   minuteTicks,
+  purchaseMinute,
   rhythm,
   timelineState,
   toViewTimeline,
@@ -125,6 +126,9 @@ describe("defaultMinute / clampMinute", () => {
   it("começa no primeiro item grande; sem item, no minuto 10 (ou no fim)", () => {
     expect(defaultMinute([{ time: 756, key: "bfury", name: "", img: null, cost: 3900 }], 47)).toBe(13);
     expect(defaultMinute([], 47)).toBe(10);
+    // comprado aos 12:20: o minuto 12 ainda não tem o item → abre no 13
+    expect(defaultMinute([{ time: 740, key: "bfury", name: "", img: null, cost: 3900 }], 47)).toBe(13);
+    expect(defaultMinute([{ time: 720, key: "bfury", name: "", img: null, cost: 3900 }], 47)).toBe(12);
     expect(defaultMinute([], 4)).toBe(4);
   });
 
@@ -132,6 +136,14 @@ describe("defaultMinute / clampMinute", () => {
     expect(clampMinute(-3, 47)).toBe(0);
     expect(clampMinute(99, 47)).toBe(47);
     expect(clampMinute(12.6, 47)).toBe(13);
+  });
+});
+
+describe("purchaseMinute (primeiro minuto em que o item já está fechado)", () => {
+  it("arredonda para cima", () => {
+    expect(purchaseMinute(740)).toBe(13);
+    expect(purchaseMinute(720)).toBe(12);
+    expect(purchaseMinute(756)).toBe(13);
   });
 });
 
