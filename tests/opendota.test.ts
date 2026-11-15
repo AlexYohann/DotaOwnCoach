@@ -8,6 +8,7 @@ import {
   getItemsFromApi,
   getMatch,
   getParseJob,
+  getPeers,
   requestParse,
   getProPlayers,
   getTeamPlayers,
@@ -541,5 +542,83 @@ describe("getTeamPlayers", () => {
     fetchMock.mockResolvedValue(new Response("", { status: 429 }));
     const err = await getTeamPlayers(1).catch((e) => e);
     expect(err.kind).toBe("rate_limit");
+  });
+});
+
+describe("getPeers", () => {
+  const rawPeer = (over: Record<string, unknown> = {}) => ({
+    account_id: 25907144,
+    last_played: 1716320761,
+    win: 901,
+    games: 1471,
+    with_win: 853,
+    with_games: 1375,
+    against_win: 48,
+    against_games: 96,
+    with_gpm_sum: 844747,
+    personaname: " Cr1t- ",
+    name: "Cr1t-",
+    avatar: "https://avatars.steamstatic.com/a.jpg",
+    avatarfull: "https://avatars.steamstatic.com/a_full.jpg",
+    ...over,
+  });
+
+  it("mapeia os campos usados (avatar médio, nome sem espaços)", async () => {
+    fetchMock.mockResolvedValue(json([rawPeer()]));
+    await expect(getPeers(86745912)).resolves.toEqual([
+      {
+        account_id: 25907144,
+        name: "Cr1t-",
+        avatar: "https://avatars.steamstatic.com/a.jpg",
+        with_games: 1375,
+        with_win: 853,
+        against_games: 96,
+        against_win: 48,
+        last_played: 1716320761,
+      },
+    ]);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.opendota.com/api/players/86745912/peers");
+  });
+
+  it("pula entradas sem account_id, com números inválidos ou repetidas", async () => {
+    fetchMock.mockResolvedValue(
+      json([
+        rawPeer({ account_id: null }),
+        rawPeer({ account_id: 2, with_games: "x" }),
+        rawPeer({ account_id: 3, against_win: -1 }),
+        rawPeer({ account_id: 4, last_played: null }),
+        rawPeer({ account_id: 5, with_win: 1.5 }),
+        null,
+        rawPeer({ account_id: 6 }),
+        rawPeer({ account_id: 6, with_games: 1 }),
+      ]),
+    );
+    const out = await getPeers(1);
+    expect(out.map((p) => p.account_id)).toEqual([6]);
+    expect(out[0].with_games).toBe(1375);
+  });
+
+  it("avatar que não é https e nome vazio viram null", async () => {
+    fetchMock.mockResolvedValue(json([rawPeer({ avatar: "http://x/a.jpg", personaname: "  " })]));
+    const [p] = await getPeers(1);
+    expect(p.avatar).toBeNull();
+    expect(p.name).toBeNull();
+  });
+
+  it("lista vazia é resposta válida", async () => {
+    fetchMock.mockResolvedValue(json([]));
+    await expect(getPeers(1)).resolves.toEqual([]);
+  });
+
+  it("404 ou corpo que não é lista: erro (não vira lista vazia)", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 404 }));
+    await expect(getPeers(1)).rejects.toBeInstanceOf(OpenDotaError);
+    fetchMock.mockResolvedValueOnce(json({ error: "x" }));
+    await expect(getPeers(1)).rejects.toBeInstanceOf(OpenDotaError);
+  });
+
+  it("HTTP 500 vira OpenDotaError unavailable", async () => {
+    fetchMock.mockResolvedValue(json({ error: "timeout" }, 500));
+    await expect(getPeers(1)).rejects.toMatchObject({ kind: "unavailable" });
   });
 });
