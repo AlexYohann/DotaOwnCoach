@@ -6,6 +6,7 @@ import { HeaderAccountSlot } from "@/components/header-account";
 import { HeroBanner } from "@/components/hero-banner";
 import { HeroCell } from "@/components/hero-cell";
 import { PageShell } from "@/components/page-shell";
+import { PlayerPeers } from "@/components/player-peers";
 import { VerifiedBadge } from "@/components/pro-suggestion-row";
 import { ResultText, SideText } from "@/components/result-text";
 import { SiteHeader } from "@/components/site-header";
@@ -25,6 +26,8 @@ import {
   isWin,
 } from "@/lib/match";
 import type { Hero, RecentMatch } from "@/lib/opendota";
+import type { PeersSnapshot } from "@/lib/peers";
+import { getPeersSnapshot } from "@/lib/peers-data";
 import { formatDecimal, mostPlayed, type MostPlayed } from "@/lib/player-summary";
 import { refreshOwnProfile } from "@/lib/profile-refresh";
 import { getVerifiedPro } from "@/lib/pros-data";
@@ -85,15 +88,19 @@ async function PlayerContent({
   let heroes: Record<number, Hero>;
   let pro: Awaited<ReturnType<typeof getVerifiedPro>>;
   let viewerId: number | null;
+  let peers: PeersSnapshot;
   try {
     // Banco primeiro (10 min), OpenDota se vencido — ver lib/data.ts.
     // getHeroes nunca lança: se falhar, devolve {} e a tabela mostra o hero_id.
     // getVerifiedPro também nunca lança e sai em paralelo: não soma tempo.
-    [player, heroes, pro, viewerId] = await Promise.all([
+    // getPeersSnapshot (v2.3) só LÊ o banco e nunca lança: quem chama a
+    // OpenDota para os parceiros é a própria seção, pela rota /peers.
+    [player, heroes, pro, viewerId, peers] = await Promise.all([
       getPlayerData(accountId),
       getHeroes(),
       getVerifiedPro(accountId),
       getViewerAccountId(),
+      getPeersSnapshot(accountId),
     ]);
   } catch (err) {
     return (
@@ -188,6 +195,14 @@ async function PlayerContent({
         <LastMatch match={last} hero={lastHero} accountId={accountId} />
         {top && <MostPlayedCard top={top} hero={heroes[top.heroId]} />}
       </HeroBanner>
+
+      <PlayerPeers
+        accountId={accountId}
+        name={name}
+        // Primeira visita: o jogador ainda está sendo gravado; a seção pergunta.
+        initial={peers.state === "unknown" ? { ...peers, state: "start" } : peers}
+        nowMs={Date.now()}
+      />
 
       {/* relative: os rótulos sr-only (absolutos) ficam presos aqui e não esticam a página no celular */}
       <div className="relative w-full max-w-6xl mx-auto px-6 pb-10 overflow-x-auto">
