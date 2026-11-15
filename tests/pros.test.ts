@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  agoLabel,
   cleanQuery,
   currentRoster,
   featuredTeams,
@@ -139,6 +140,24 @@ describe("lastPlayedLabel", () => {
   it("sem data ou data inválida", () => {
     expect(lastPlayedLabel(null, now)).toBe("sem partidas recentes");
     expect(lastPlayedLabel("lixo", now)).toBe("sem partidas recentes");
+  });
+});
+
+describe("agoLabel", () => {
+  const now = Date.parse("2026-11-12T12:00:00Z");
+  const at = (iso: string) => Date.parse(iso);
+
+  it("dias, meses e anos no calendário de São Paulo", () => {
+    expect(agoLabel(at("2026-11-12T03:00:00Z"), now)).toBe("hoje");
+    expect(agoLabel(at("2026-11-11T10:00:00Z"), now)).toBe("ontem");
+    expect(agoLabel(at("2026-11-01T12:00:00Z"), now)).toBe("há 11 dias");
+    expect(agoLabel(at("2026-10-10T12:00:00Z"), now)).toBe("há 1 mês");
+    expect(agoLabel(at("2026-08-12T12:00:00Z"), now)).toBe("há 3 meses");
+    expect(agoLabel(at("2025-01-20T12:00:00Z"), now)).toBe("há mais de um ano");
+  });
+
+  it("data no futuro (relógio adiantado) vira hoje", () => {
+    expect(agoLabel(at("2026-11-13T12:00:00Z"), now)).toBe("hoje");
   });
 });
 
