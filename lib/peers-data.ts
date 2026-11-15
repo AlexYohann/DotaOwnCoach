@@ -2,6 +2,9 @@ import "server-only";
 import { getPeers } from "@/lib/opendota";
 import {
   peersState,
+  PEERS_KEEP_ON_EMPTY_MS,
+  PEERS_PER_DAY,
+  PEERS_PER_MINUTE,
   PEERS_RETRY_MS,
   PEERS_RUNNING_MS,
   PEERS_TTL_MS,
@@ -49,9 +52,9 @@ export async function getPeersSnapshot(
 }
 
 /**
- * Renova a lista de uma conta. Só UMA renovação por conta de cada vez (reserva
- * atômica no banco); falha da OpenDota fica marcada e bloqueia novas tentativas
- * por 10 min. Nunca lança.
+ * Renova a lista de uma conta. Só UMA renovação por conta de cada vez e no
+ * máximo 5/min e 300/dia no site inteiro (reserva atômica no banco); falha da
+ * OpenDota fica marcada e bloqueia novas tentativas por 10 min. Nunca lança.
  */
 export async function refreshPeers(accountId: number): Promise<"saved" | "busy" | "failed"> {
   const admin = createAdminClient();
@@ -66,6 +69,8 @@ export async function refreshPeers(accountId: number): Promise<"saved" | "busy" 
     p_ttl_s: PEERS_TTL_MS / 1000,
     p_running_s: PEERS_RUNNING_MS / 1000,
     p_retry_s: PEERS_RETRY_MS / 1000,
+    p_per_minute: PEERS_PER_MINUTE,
+    p_per_day: PEERS_PER_DAY,
   });
   if (claimError) {
     logDb("reservar renovação de parceiros", claimError);
@@ -91,15 +96,23 @@ export async function refreshPeers(accountId: number): Promise<"saved" | "busy" 
     return "failed";
   }
 
-  // Lista vazia por cima de uma lista boa é quase certamente defeito da
-  // OpenDota (partidas juntos só aumentam): mantém a boa.
+  // Lista vazia por cima de uma lista boa: partidas juntos só aumentam, então
+  // é defeito da OpenDota ou perfil fechado. Mantém a boa por até 7 dias; na
+  // dúvida (erro ao ler a salva), não apaga nada.
   if (peers.length === 0) {
-    const { data: saved } = await admin
+    const { data: saved, error: readError } = await admin
       .from("player_peers")
-      .select("peers")
+      .select("peers, fetched_at")
       .eq("account_id", accountId)
-      .maybeSingle<{ peers: Peer[] | null }>();
-    if (Array.isArray(saved?.peers) && saved.peers.length > 0) {
+      .maybeSingle<{ peers: Peer[] | null; fetched_at: string | null }>();
+    if (readError) {
+      logDb("ler player_peers salva", readError);
+      await markFailed();
+      return "failed";
+    }
+    const savedAt = saved?.fetched_at ? Date.parse(saved.fetched_at) : NaN;
+    const recentEnough = !(Date.now() - savedAt >= PEERS_KEEP_ON_EMPTY_MS); // data inválida = recente
+    if (Array.isArray(saved?.peers) && saved.peers.length > 0 && recentEnough) {
       console.warn(`[peers] lista vazia para ${accountId}; mantendo a salva`);
       await markFailed();
       return "failed";

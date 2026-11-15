@@ -15,10 +15,11 @@ import { agoLabel } from "@/lib/pros";
 const POLL_MS = 8000;
 const MAX_POLLS = 12;
 const UNKNOWN_RETRY_MS = 3000;
+const MAX_UNKNOWN_RETRIES = 3;
 // Visíveis de cara: o resto fica recolhido, para não empurrar a tabela de partidas.
 const VISIBLE = 6;
 
-type Problem = "slow" | "failed" | null;
+type Problem = "slow" | "failed" | "unknown" | null;
 
 const count = new Intl.NumberFormat("pt-BR");
 
@@ -42,7 +43,7 @@ export function PlayerPeers({
     const abort = new AbortController();
     let timer: ReturnType<typeof setTimeout> | null = null;
     let polls = 0;
-    let unknownRetried = false;
+    let unknownRetries = 0;
     const wait = (ms: number, next: () => void) => {
       timer = setTimeout(next, ms);
     };
@@ -65,8 +66,8 @@ export function PlayerPeers({
       if (state === "failed") return setProblem("failed");
       if (state === "unknown") {
         // Primeira visita: a página ainda pode estar gravando o jogador (after()).
-        if (unknownRetried) return setProblem("failed");
-        unknownRetried = true;
+        if (unknownRetries >= MAX_UNKNOWN_RETRIES) return setProblem("unknown");
+        unknownRetries += 1;
         return wait(UNKNOWN_RETRY_MS, ask);
       }
       // refreshing ou erro de rede: pergunta de novo, até o limite.
@@ -92,6 +93,7 @@ export function PlayerPeers({
 
   let message: string | null = null;
   if (problem === "failed") message = "A OpenDota não entregou a lista agora. Tente de novo mais tarde.";
+  else if (problem === "unknown") message = "Ainda salvando este jogador. Recarregue a página daqui a pouco para ver os parceiros.";
   else if (problem === "slow") message = "A OpenDota está demorando para montar a lista. Volte daqui a pouco.";
   else if (working && !peers) message = `Buscando quem joga com ${name} na OpenDota… pode levar até um minuto.`;
 

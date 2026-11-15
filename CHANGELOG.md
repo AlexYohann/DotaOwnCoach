@@ -3,6 +3,22 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [2.3.0] — 2026-11-15
+
+### Adicionado
+- **Quem joga com {nome}**, na página de qualquer jogador, entre o banner e a tabela de partidas: as pessoas com quem ele jogou 3 ou mais partidas no mesmo time, com partidas juntos, vitórias e derrotas juntos (e a porcentagem), partidas contra e "última vez há X". Cada cartão leva à página daquela pessoa, onde estão as partidas recentes dela.
+- Recentes primeiro (partida em comum nos últimos 90 dias), até 6 à vista; o resto fica em "Mais parceiros recentes" e "Parceiros antigos", recolhidos. Sem isso, os primeiros da lista eram amigos de anos atrás.
+- A página não espera pela lista. A OpenDota leva ~45 s para montá-la (e às vezes falha com erro 500), então ela fica guardada no banco por 12 h e é renovada em segundo plano: na primeira visita aparece "Buscando quem joga com…" e a lista surge sozinha. Se a OpenDota falhar, aparece um aviso, a lista antiga continua na tela e o site só tenta de novo depois de 10 min.
+
+### Técnico
+- Tabela `player_peers` (migração `20261115000000_v2_3_player_peers.sql`): RLS com leitura pública (os dados já são públicos na OpenDota) e nenhuma política de escrita. Função `claim_peers_refresh` (security definer, sem execução para `anon`/`authenticated`) reserva a renovação de forma atômica: duas abas → uma chamada à OpenDota.
+- Regras puras em `lib/peers.ts`; leitura e renovação em `lib/peers-data.ts`; `getPeers` em `lib/opendota.ts` (tempo máximo de 60 s); rota `GET /player/[id]/peers` renova dentro de `after()`; seção em `components/player-peers.tsx`. A renovação só começa pelo navegador: robôs de busca não gastam chamadas.
+- `agoLabel` ("hoje", "há 3 dias"…) extraído de `lastPlayedLabel` (`lib/pros.ts`).
+- **Teto do site inteiro:** no máximo 5 buscas de parceiros por minuto e 300 por dia (tabela `peers_refresh_log`, migração `20261115010000_v2_3_peers_budget.sql`; RLS ligado sem política, de propósito — só a função mexe nela). Achado da revisão final: o Googlebot executa JavaScript, então "só o navegador dispara" não bastava para proteger o limite da OpenDota.
+- Revisão final (antes do merge), também corrigido com teste: um erro do banco no meio da renovação podia apagar uma lista boa; quem fecha o perfil ficava com a lista antiga para sempre (agora some depois de 7 dias de lista vazia); a primeira visita mostrava "a OpenDota não entregou" quando o problema era só o jogador ainda sendo salvo; a rota ganhou testes.
+- A função antiga `claim_peers_refresh` de 4 parâmetros foi neutralizada (sempre "não reserva") em vez de apagada: o `DROP` pede confirmação manual. Apagar fica para uma limpeza.
+- 360 testes (Vitest). Página do jogador aquecida igual à de antes (~0,1–0,16 s em `next start`); a lista nova aparece em ~30–45 s na primeira visita.
+
 ## [2.2.1] — 2026-11-14
 
 ### Corrigido

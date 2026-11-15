@@ -43,6 +43,13 @@ export const PEERS_RECENT_DAYS = 90;
 export const PEERS_TTL_MS = 12 * 60 * MIN; // parceiros mudam devagar
 export const PEERS_RUNNING_MS = 2 * MIN; // tempo máximo da chamada (60 s) + folga
 export const PEERS_RETRY_MS = 10 * MIN; // OpenDota falhou: espera antes de tentar de novo
+// Lista vazia depois de uma cheia: defeito da OpenDota, ou a conta fechou o
+// perfil ("Expor dados públicos" desligado). Até 7 dias, mantém a cheia; depois, aceita.
+export const PEERS_KEEP_ON_EMPTY_MS = 7 * DAY;
+// Teto do site inteiro (função claim_peers_refresh). OpenDota grátis: ~60/min e
+// ~3.000/dia, divididos com o resto do site (a análise de replay usa até 30/min e 500/dia).
+export const PEERS_PER_MINUTE = 5;
+export const PEERS_PER_DAY = 300;
 
 /** Só quem tem 3+ partidas juntos; mais partidas primeiro (empate: mais recente); no máximo 60. */
 export function selectPeers(raw: Peer[]): Peer[] {

@@ -25,7 +25,7 @@ Ideia original do Alex, "partidas de amigos": ver com quem a pessoa joga e como 
 3. Só entra quem tem **3 ou mais partidas juntos** [minha escolha: 1–2 partidas juntos costuma ser desconhecido que caiu no mesmo time].
 4. Cada pessoa mostra: avatar, nome (**link para `/player/<id>`**), partidas juntos, vitórias e derrotas juntos (`V`/`D` nas cores de vitória/derrota, como no cartão "Mais jogado") com a porcentagem, partidas contra com as vitórias de quem está sendo visto e "última vez há X".
 5. **A página nunca espera a OpenDota por causa dessa lista.** A lista fica no Supabase; vencida ou ausente, a renovação roda em segundo plano e a seção se atualiza sozinha.
-6. **Pública**, como o resto da página do jogador [minha escolha: os dados já são públicos na OpenDota e a renovação só começa pelo navegador (JavaScript), então robôs de busca não gastam chamadas. Diferente da linha do tempo, aqui não há um custo de 10 chamadas que justifique exigir login. Se o Alex quiser como "valor a mais para logados", basta trocar a seção por um convite, como fizemos na v2.2].
+6. **Pública**, como o resto da página do jogador [minha escolha: os dados já são públicos na OpenDota e a renovação só começa pelo navegador (JavaScript). Isso afasta robôs simples, mas **não** o Googlebot, que executa JavaScript; por isso há um teto do site inteiro (abaixo). Diferente da linha do tempo, aqui não há um custo de 10 chamadas que justifique exigir login. Se o Alex quiser como "valor a mais para logados", basta trocar a seção por um convite, como fizemos na v2.2].
 
 ## Não-objetivos
 
@@ -89,7 +89,9 @@ Grade com 1 coluna no celular, 2 a partir de `sm` e 3 a partir de `lg`. Estados:
 
 **Na borda (`lib/opendota.ts`):** `getPeers(accountId)` descarta entradas sem `account_id` positivo ou com números inválidos; nome vira texto ou null; avatar só se for `https`. Lista ausente/estranha = erro (não grava lista vazia por cima de uma boa).
 
-**Custo no limite da OpenDota:** 1 chamada por conta a cada 12 h no máximo (mais 1 a cada 10 min enquanto ela estiver falhando) e só quando alguém abre a página com JavaScript. O limite gratuito é de 60 por minuto, compartilhado com o resto do site.
+**Custo no limite da OpenDota:** 1 chamada por conta a cada 12 h no máximo (mais 1 a cada 10 min enquanto ela estiver falhando) e só quando alguém abre a página com JavaScript. **Teto do site inteiro (revisão final):** no máximo 5 buscas de parceiros por minuto e 300 por dia, contadas em `peers_refresh_log` (uma linha por reserva, RLS sem política, só a função mexe) dentro da mesma função de reserva, serializada por advisory lock. O limite gratuito da OpenDota é ~60/min e ~3.000/dia, compartilhado com o resto do site (a análise de replay já usa até 30/min e 500/dia). Acima do teto a seção continua "buscando" e tenta de novo nas perguntas seguintes.
+
+**Lista vazia depois de uma cheia** (defeito da OpenDota ou perfil fechado): mantém a cheia por até 7 dias; depois aceita a vazia, para não mostrar para sempre parceiros de quem fechou o perfil.
 
 ## Pronto quando
 

@@ -15,6 +15,8 @@ let adminEnabled: boolean;
 let claimResult: { data: unknown; error: unknown };
 let rpcCalls: { fn: string; args: Record<string, unknown> }[];
 let updates: Record<string, unknown>[];
+let savedReadError: boolean;
+let updateError: boolean;
 
 function readBuilder() {
   const b = {
@@ -34,11 +36,16 @@ function adminBuilder() {
   let payload: Record<string, unknown> | null = null;
   const run = () => {
     if (payload) {
+      if (updateError) return { data: null, error: { code: "XX", message: "falhou" } };
       updates.push(payload);
       if (peersRow) Object.assign(peersRow, payload);
       return { data: null, error: null };
     }
-    return { data: peersRow ? { peers: peersRow.peers } : null, error: null };
+    if (savedReadError) return { data: null, error: { code: "XX", message: "falhou" } };
+    return {
+      data: peersRow ? { peers: peersRow.peers, fetched_at: peersRow.fetched_at } : null,
+      error: null,
+    };
   };
   const b = {
     select: () => b,
@@ -103,6 +110,8 @@ beforeEach(() => {
   claimResult = { data: true, error: null };
   rpcCalls = [];
   updates = [];
+  savedReadError = false;
+  updateError = false;
   getPeers.mockReset();
   vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -148,7 +157,14 @@ describe("refreshPeers", () => {
     expect(rpcCalls).toEqual([
       {
         fn: "claim_peers_refresh",
-        args: { p_account_id: 1, p_ttl_s: 43200, p_running_s: 120, p_retry_s: 600 },
+        args: {
+          p_account_id: 1,
+          p_ttl_s: 43200,
+          p_running_s: 120,
+          p_retry_s: 600,
+          p_per_minute: 5,
+          p_per_day: 300,
+        },
       },
     ]);
     expect(updates).toEqual([
@@ -187,6 +203,27 @@ describe("refreshPeers", () => {
     await expect(refreshPeers(1)).resolves.toBe("failed");
     expect(peersRow.peers).toEqual([peer(2, 5)]);
     expect(updates).toEqual([{ refresh_failed_at: iso(NOW), refresh_started_at: null }]);
+  });
+
+  it("lista vazia: erro ao ler a salva não apaga nada", async () => {
+    peersRow = { ...emptyRow(), peers: [peer(2, 5)], fetched_at: iso(NOW - 13 * HOUR) };
+    savedReadError = true;
+    getPeers.mockResolvedValue([]);
+    await expect(refreshPeers(1)).resolves.toBe("failed");
+    expect(peersRow.peers).toEqual([peer(2, 5)]);
+  });
+
+  it("lista vazia por 7 dias (perfil fechado): aceita e some da tela", async () => {
+    peersRow = { ...emptyRow(), peers: [peer(2, 5)], fetched_at: iso(NOW - 8 * 24 * HOUR) };
+    getPeers.mockResolvedValue([]);
+    await expect(refreshPeers(1)).resolves.toBe("saved");
+    expect(peersRow.peers).toEqual([]);
+  });
+
+  it("erro ao gravar a lista: failed, sem lançar", async () => {
+    getPeers.mockResolvedValue([peer(3, 7)]);
+    updateError = true;
+    await expect(refreshPeers(1)).resolves.toBe("failed");
   });
 
   it("lista vazia sem nada salvo é resposta válida", async () => {
