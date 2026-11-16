@@ -99,19 +99,24 @@ const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
 // Dia de calendário em São Paulo, como número de dias desde 1970.
 const dayNumber = (ms: number) => Date.parse(DAY_FORMAT.format(ms)) / DAY_MS;
 
+/** "hoje", "ontem", "há 3 dias"… pelo calendário de São Paulo. Futuro conta como hoje. */
+export function agoLabel(thenMs: number, nowMs: number): string {
+  const days = Math.max(0, dayNumber(nowMs) - dayNumber(thenMs));
+  if (days === 0) return "hoje";
+  if (days === 1) return "ontem";
+  if (days < 30) return `há ${days} dias`;
+  if (days < 365) {
+    const months = Math.floor(days / 30);
+    return `há ${months} ${months === 1 ? "mês" : "meses"}`;
+  }
+  return "há mais de um ano";
+}
+
 /** "jogou há X" a partir da última partida conhecida. */
 export function lastPlayedLabel(iso: string | null, nowMs: number): string {
   const then = iso ? Date.parse(iso) : NaN;
   if (Number.isNaN(then)) return "sem partidas recentes";
-  const days = Math.max(0, dayNumber(nowMs) - dayNumber(then));
-  if (days === 0) return "jogou hoje";
-  if (days === 1) return "jogou ontem";
-  if (days < 30) return `jogou há ${days} dias`;
-  if (days < 365) {
-    const months = Math.floor(days / 30);
-    return `jogou há ${months} ${months === 1 ? "mês" : "meses"}`;
-  }
-  return "jogou há mais de um ano";
+  return `jogou ${agoLabel(then, nowMs)}`;
 }
 
 /** Brasão só se for https (http daria aviso de conteúdo misto; outros esquemas, nunca). */

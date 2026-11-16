@@ -1,4 +1,5 @@
 import "server-only";
+import type { Peer } from "@/lib/peers";
 import type { Purchase, Timeline } from "@/lib/timeline";
 
 const BASE_URL = "https://api.opendota.com/api";
@@ -466,8 +467,11 @@ const MAX_UNIX_SECONDS = 4_102_444_800; // ano 2100
 const unixSeconds = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) && v > 0 && v < MAX_UNIX_SECONDS ? v : null;
 
-async function requestList(path: string): Promise<Record<string, unknown>[]> {
-  const data = await request<unknown>(path, LIST_TIMEOUT_MS);
+async function requestList(
+  path: string,
+  timeoutMs = LIST_TIMEOUT_MS,
+): Promise<Record<string, unknown>[]> {
+  const data = await request<unknown>(path, timeoutMs);
   if (!Array.isArray(data)) {
     throw new OpenDotaError("unavailable", `${path} não devolveu uma lista`);
   }
@@ -532,6 +536,49 @@ export async function getTeamPlayers(teamId: number): Promise<TeamMember[]> {
       games_played: typeof m.games_played === "number" ? m.games_played : 0,
       is_current_team_member:
         typeof m.is_current_team_member === "boolean" ? m.is_current_team_member : null,
+    });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Parceiros (v2.3). Soma o histórico inteiro do jogador: é um serviço bem mais
+// lento que o resto da OpenDota (43–46 s medidos em 2026-11-15, às vezes 500
+// depois de 30–60 s). Por isso só roda em segundo plano (lib/peers-data.ts).
+
+const PEERS_TIMEOUT_MS = 60000;
+const count = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 0;
+
+/** Todos que já estiveram em partidas com o jogador. Lança OpenDotaError (404 incluso). */
+export async function getPeers(accountId: number): Promise<Peer[]> {
+  const list = await requestList(`/players/${accountId}/peers`, PEERS_TIMEOUT_MS);
+  const out: Peer[] = [];
+  const seen = new Set<number>();
+  for (const p of list) {
+    const lastPlayed = unixSeconds(p.last_played);
+    if (
+      !positiveInt(p.account_id) ||
+      seen.has(p.account_id) ||
+      lastPlayed === null ||
+      !count(p.with_games) ||
+      !count(p.with_win) ||
+      !count(p.against_games) ||
+      !count(p.against_win)
+    ) {
+      continue;
+    }
+    seen.add(p.account_id);
+    const avatar = text(p.avatar);
+    out.push({
+      account_id: p.account_id,
+      name: text(p.personaname),
+      avatar: avatar?.startsWith("https://") ? avatar : null,
+      with_games: p.with_games,
+      with_win: p.with_win,
+      against_games: p.against_games,
+      against_win: p.against_win,
+      last_played: lastPlayed,
     });
   }
   return out;
