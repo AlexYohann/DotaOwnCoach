@@ -3,6 +3,25 @@
 Versões seguem [SemVer](https://semver.org/lang/pt-BR/): MAJOR.MINOR.PATCH.
 Cada versão tem uma tag git `vX.Y.Z`.
 
+## [2.4.0] — 2026-11-16
+
+### Adicionado
+- **Diário.** Na tela de uma partida sua, "Anotar esta partida" abre a sua nota, que só você vê: o que deu certo e o que deu errado (cada lado com etiquetas e um texto) e os itens que faltaram, cada um com o motivo. As etiquetas fixas são Fase de rotas, Farm, Mortes evitáveis, Posicionamento, Lutas em equipe, Visão, Objetivos e Rotações. Você pode criar as suas, e elas voltam como opção nas próximas notas, com a mesma grafia.
+- **Perfil com abas:** "Últimas partidas", "Quem joga comigo" e "Diário" (só na sua página, só para você). Os parceiros da v2.3 saíram da tela de partidas e ganharam a aba deles; a busca lenta na OpenDota só acontece quando alguém abre essa aba.
+- **Aba Diário:** resumo das notas, com o que mais deu errado e o que mais deu certo, em quantas partidas cada etiqueta apareceu, quanto você venceu nelas, os seus textos e os itens que mais faltaram. Setas comparam com o período anterior de mesmo tamanho (tolerância de 5 pontos). Filtros: 7, 30 ou 90 dias, tudo, por herói, ou partidas escolhidas a dedo.
+- Na sua tabela de partidas, cada partida mostra as etiquetas da nota ou "+ anotar". O menu do avatar ganhou "Meu diário" e "Quem joga comigo".
+
+### Mudado
+- Botão de pausar a animação do herói com ícones de traço no lugar dos símbolos ⏸/▶, que o Windows desenha como emoji. Regra do projeto a partir desta versão: nada de emoji na interface.
+
+### Técnico
+- Tabela `match_notes` (migração `20261116010000_v2_4_match_notes.sql`): primeira tabela com conteúdo escrito pelo usuário. O servidor grava **com a sessão do usuário** (não com a secret key) e o RLS confere o dono em SELECT, INSERT, UPDATE e DELETE; INSERT e UPDATE também exigem a conta Steam da própria sessão. Nada para `anon`. Limites de tamanho também no banco.
+- Teste obrigatório "duas contas": `supabase/tests/v2_4_match_notes_rls.sql` simula dois usuários e um visitante e confere cada regra (rodado no banco: todas conferem; o teste desfaz tudo no fim).
+- Rota `PUT/DELETE /match/[id]/note`: autor sempre da sessão; só quem jogou a partida anota (403); herói, resultado e data copiados da partida.
+- Regras em `lib/diary.ts`; leitura e escrita em `lib/notes-data.ts`; perfil em `components/player-frame.tsx` (banner + abas comuns às três páginas).
+- Revisão final (antes do merge): nada crítico nem importante. Corrigido com teste: o limite real de notas lidas é 1.000 (máximo do Supabase); a tela da partida e a gravação leem só a nota da partida e só as etiquetas das outras; texto escrito sem etiqueta agora aparece em "Sem etiqueta" no resumo; os filtros não guardam a escolha antiga depois de "Limpar"; o limite de bytes dos itens no banco podia recusar um motivo válido (migração `20261116020000_v2_4_items_check.sql`).
+- 424 testes (Vitest). Páginas do perfil em `next start`: 0,12–0,17 s.
+
 ## [2.3.0] — 2026-11-15
 
 ### Adicionado

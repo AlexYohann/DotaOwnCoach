@@ -1,6 +1,6 @@
 # v2.4 — Diário: design
 
-Data: 2026-11-16 · Status: **aguardando aprovação do Alex** (revisão de construtor feita; respostas incorporadas). As escolhas de tela foram do Alex, feitas sobre mockups. As decisões técnicas foram delegadas a mim e estão marcadas. Mockups (não versionados): `.superpowers/brainstorm/50036-1794837904/content/` — `nota-da-partida.html` (escolhida **A**), `resumo-do-mes.html` (escolhida **B**), `perfil-abas.html` e `diario-filtros.html` (aprovados como estão).
+Data: 2026-11-16 · Status: **aprovado pelo Alex** em 2026-11-16 (revisão de construtor feita; respostas incorporadas). As escolhas de tela foram do Alex, feitas sobre mockups. As decisões técnicas foram delegadas a mim e estão marcadas. Mockups (não versionados): `.superpowers/brainstorm/50036-1794837904/content/` — `nota-da-partida.html` (escolhida **A**), `resumo-do-mes.html` (escolhida **B**), `perfil-abas.html` e `diario-filtros.html` (aprovados como estão).
 
 Legenda: **[Alex]** = decidido por ele. **[minha escolha]** = decisão minha, que ele pode derrubar ao ler.
 
@@ -17,12 +17,14 @@ O site é um coach. Depois de uma partida, o Alex quer registrar o que deu certo
 2. **Etiquetas:** uma lista fixa [minha escolha, o Alex não mexeu] — Fase de rotas, Farm, Mortes evitáveis, Posicionamento, Lutas em equipe, Visão, Objetivos, Rotações — mais **etiquetas próprias** criadas pelo usuário, que entram no resumo do mesmo jeito.
 3. **Perfil com abas** [Alex]: na página do jogador, abaixo do banner, as abas **"Últimas partidas"** (a principal), **"Quem joga comigo"** (em outro jogador: "Quem joga com {nome}") e **"Diário"** (só na sua página e só para você). **A seção de parceiros da v2.3 sai da tela de partidas** e vira a aba.
 4. **Menu do avatar** com os atalhos **"Meu diário"** e **"Quem joga comigo"** [Alex].
-5. **Tabela de "Últimas partidas"** (só na sua página, só para você): partida com nota mostra 📝 e as etiquetas marcadas; partida sem nota mostra "+ anotar", que leva à partida já na nota [mockup aprovado].
+5. **Tabela de "Últimas partidas"** (só na sua página, só para você): partida com nota mostra um ícone de caderno (lucide `NotebookPen`, traço fino, cor do texto secundário) e as etiquetas marcadas; partida sem nota mostra "+ anotar", que leva à partida já na nota [mockup aprovado].
 6. **Aba Diário = resumo** [Alex, mockup B + filtros]. O cabeçalho mostra "N partidas anotadas · xV yD", **sem** o "de 41 jogadas" do mockup [minha escolha, resposta à revisão]: o total jogado no período exigiria outra chamada à OpenDota (`/wl`), que é lenta e instável como a de parceiros.
    - **"Mais deu errado"** e **"Mais deu certo"**: cada etiqueta com "em N de M partidas anotadas" e a taxa de vitória nessas partidas, uma barra proporcional e os seus textos daquele lado nessas partidas (do mais recente para o mais antigo);
    - **"Itens que mais faltaram"**: item, quantas vezes e os motivos;
    - **setas de evolução** em relação ao período anterior de mesmo tamanho (▼ menos, ▲ mais, = igual, "novo" se não aparecia antes);
    - **filtros:** período (7 dias, 30 dias, 90 dias, Tudo; padrão 30 dias), **herói** (só os heróis que têm nota, com a contagem; padrão Todos) e **"Escolher partidas…"** (lista das partidas anotadas com caixas de marcar). Período e herói se combinam. Com partidas escolhidas a dedo, o período e o herói são ignorados e **não há setas**. Em "Tudo" também não há setas. "Limpar" volta ao período.
+
+**Sem emoji na interface** [Alex, 2026-11-16: emoji "entrega" que é feito por IA e desmerece o projeto]. Onde um ícone ajuda, lucide (traço fino, como no resto do site); senão, texto.
 
 ## Não-objetivos
 
@@ -82,7 +84,7 @@ O site é um coach. Depois de uma partida, o Alex quer registrar o que deu certo
 
 **Ler a própria nota na partida:** a página da partida, se o visitante jogou a partida, lê a nota com o cliente da sessão e entrega ao editor. Partida que o visitante não jogou → nenhum editor e nenhuma leitura.
 
-**Tela da partida:** o editor fica abaixo do painel do herói, recolhido se não houver nota ("📝 Anotar esta partida"), aberto se houver nota ou se a URL tiver `#nota` (o "+ anotar" da tabela usa `/match/<id>?player=<conta>#nota`).
+**Tela da partida:** o editor fica abaixo do painel do herói, recolhido se não houver nota ("Anotar esta partida"), aberto se houver nota ou se a URL tiver `#nota` (o "+ anotar" da tabela usa `/match/<id>?player=<conta>#nota`).
 
 **Tabela de partidas:** na sua página e para você, as notas das 20 partidas vêm de uma leitura extra em paralelo (cliente da sessão, `match_id in (…)`). Visitantes e outras páginas não fazem essa leitura.
 
@@ -103,7 +105,7 @@ O site é um coach. Depois de uma partida, o Alex quer registrar o que deu certo
 ## Pronto quando
 
 1. **Duas contas:** com duas contas (simuladas no banco com dois `auth.uid()` diferentes, além do teste automático das regras), nenhuma lê, edita ou apaga a nota da outra, e `anon` não lê nada. **Obrigatório.**
-2. O Alex anota uma partida dele, a nota aparece na tabela com 📝 e as etiquetas, e entra no resumo.
+2. O Alex anota uma partida dele, a nota aparece na tabela com o ícone de caderno e as etiquetas, e entra no resumo.
 3. O resumo de 30 dias, filtrado por herói e por partidas escolhidas, bate com uma contagem feita à mão sobre notas de teste.
 4. A tela de partidas não tem mais a seção de parceiros, e a aba de parceiros funciona como na v2.3.
 5. A página do jogador não fica mais lenta (medir em `next start` e em produção). 390 px sem vazar.
@@ -111,3 +113,12 @@ O site é um coach. Depois de uma partida, o Alex quer registrar o que deu certo
 ## Para quem for construir
 
 Textos exatos, espaçamento, ícones, o esqueleto de carregamento das abas e o componente de escolha de item (busca pelo nome sobre o mapa de itens da partida) ficam a critério de quem constrói, seguindo a paleta existente e os mockups.
+
+## Depois da revisão final (2026-11-16)
+
+Corrigido com teste: limite real de notas é 1.000 (máximo de linhas do PostgREST); a tela da partida e a rota leem só a nota da partida e só as etiquetas das outras; texto sem etiqueta aparece em "Sem etiqueta" no resumo; filtros não guardam a escolha antiga; limite de bytes dos itens afrouxado (migração `20261116020000_v2_4_items_check.sql`).
+
+Aceito, sem correção [minha escolha]:
+- Quem chamar a API REST direto com a própria sessão pode gravar `match_id`/herói/resultado arbitrários na própria nota. Só afeta o próprio diário; bloquear colunas no UPDATE quebraria o upsert normal.
+- Se a OpenDota cair sem dado salvo (ou a conta não tiver partidas públicas), o quadro do perfil mostra o erro e o Diário fica inacessível naquele momento. Raro; as notas continuam no banco.
+- O 404 do Diário para quem não é o dono volta com status HTTP 200 (o `notFound()` roda dentro do Suspense, depois do início do streaming). Nenhuma nota é lida nem enviada.

@@ -52,3 +52,24 @@ export async function getHeaderAccount(): Promise<HeaderAccount | null> {
   if (error) console.error(`[db] ler players (cabeçalho): ${error.code ?? ""} ${error.message}`);
   return toHeaderAccount(accountId, error ? null : data);
 }
+
+/** Quem está logado, para gravar dados do próprio usuário (v2.4). */
+export type ViewerSession = { userId: string; accountId: number };
+
+/**
+ * userId (auth.uid, o "sub" do JWT) e account_id de quem está logado, ou null.
+ * Os dois vêm do JWT validado pelo Supabase, nunca do corpo da requisição.
+ * Nunca lança.
+ */
+export async function getViewerSession(): Promise<ViewerSession | null> {
+  try {
+    const { data } = await (await createClient()).auth.getClaims();
+    const claims = data?.claims;
+    const accountId = accountIdFromClaims(claims);
+    const userId = claims?.sub;
+    if (accountId === null || typeof userId !== "string" || !userId) return null;
+    return { userId, accountId };
+  } catch {
+    return null;
+  }
+}

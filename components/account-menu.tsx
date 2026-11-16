@@ -119,6 +119,16 @@ export function AccountMenu({ account }: { account: HeaderAccount }) {
           <Link href={`/player/${account.accountId}`}>Minhas partidas</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
+          <Link href={`/player/${account.accountId}/diario`} prefetch={false}>
+            Meu diário
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/player/${account.accountId}/parceiros`} prefetch={false}>
+            Quem joga comigo
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <a
             href={steamProfileUrl(account.accountId)}
             target="_blank"
