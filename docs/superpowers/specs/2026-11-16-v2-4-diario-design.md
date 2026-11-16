@@ -1,6 +1,6 @@
 # v2.4 — Diário: design
 
-Data: 2026-11-16 · Status: **aguardando aprovação do Alex** (revisão de construtor feita; respostas incorporadas). As escolhas de tela foram do Alex, feitas sobre mockups. As decisões técnicas foram delegadas a mim e estão marcadas. Mockups (não versionados): `.superpowers/brainstorm/50036-1794837904/content/` — `nota-da-partida.html` (escolhida **A**), `resumo-do-mes.html` (escolhida **B**), `perfil-abas.html` e `diario-filtros.html` (aprovados como estão).
+Data: 2026-11-16 · Status: **aprovado pelo Alex** em 2026-11-16 (revisão de construtor feita; respostas incorporadas). As escolhas de tela foram do Alex, feitas sobre mockups. As decisões técnicas foram delegadas a mim e estão marcadas. Mockups (não versionados): `.superpowers/brainstorm/50036-1794837904/content/` — `nota-da-partida.html` (escolhida **A**), `resumo-do-mes.html` (escolhida **B**), `perfil-abas.html` e `diario-filtros.html` (aprovados como estão).
 
 Legenda: **[Alex]** = decidido por ele. **[minha escolha]** = decisão minha, que ele pode derrubar ao ler.
 
