@@ -16,6 +16,8 @@ import { getViewerAccountId } from "@/lib/account";
 import { heroKey } from "@/lib/hero-art";
 import { formatDuration, formatStartTime, unitLabel } from "@/lib/match";
 import { getHeroes, getItems, getMatchData } from "@/lib/data";
+import { knownTags } from "@/lib/diary";
+import { getMyNotes } from "@/lib/notes-data";
 import {
   type Hero,
   type Item,
@@ -136,6 +138,23 @@ async function MatchContent({
     );
   };
 
+  // Diário (v2.4): só quem jogou a partida vê (e só a própria nota). As notas
+  // saem do banco com a sessão da pessoa; quem não jogou não dispara leitura.
+  const viewerPlayed = viewerId !== null && match.players.some((p) => p.account_id === viewerId);
+  let note: React.ComponentProps<typeof MatchView>["note"] = null;
+  if (viewerPlayed) {
+    const notes = await getMyNotes();
+    note = {
+      initial: notes.find((n) => n.matchId === match.match_id) ?? null,
+      knownTags: knownTags(notes),
+      // Itens que dá para comprar (sem receitas), em ordem alfabética.
+      items: Object.values(items)
+        .filter((it) => (it.cost ?? 0) > 0 && !it.key.startsWith("recipe_"))
+        .map((it) => ({ id: it.id, name: it.name, img: it.img }))
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    };
+  }
+
   // Linha do tempo (v2.2): só para quem está logado. Deslogado, os dados por
   // minuto NÃO vão para o navegador — não é só esconder na tela.
   const timeline = timelineState(viewerId, match.parsed ?? false);
@@ -199,6 +218,7 @@ async function MatchContent({
       players={players}
       timelineState={timeline}
       account={<HeaderAccountSlot />}
+      note={note}
     />
   );
 }

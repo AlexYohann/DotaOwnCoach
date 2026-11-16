@@ -9,6 +9,8 @@ import { ItemList, type ViewItem } from "@/components/match-items";
 import { ResultText, SideText } from "@/components/result-text";
 import { SiteHeader } from "@/components/site-header";
 import { MatchTip } from "@/components/match-tip";
+import type { Note } from "@/lib/diary";
+import { MatchNote, type PickerItem } from "@/components/match-note";
 import { MatchTimeline } from "@/components/match-timeline";
 import { MatchTimelineGate } from "@/components/match-timeline-gate";
 import { TeamTables } from "@/components/team-tables";
@@ -90,11 +92,14 @@ export function MatchView({
   players,
   timelineState,
   account,
+  note,
 }: {
   summary: MatchSummary;
   players: ViewPlayer[];
   timelineState: TimelineState;
   account: React.ReactNode; // HeaderAccountSlot (componente de servidor) vindo da página
+  // Diário (v2.4): só quando quem está vendo jogou a partida.
+  note: { initial: Note | null; knownTags: string[]; items: PickerItem[] } | null;
 }) {
   const [selectedSlot, setSelectedSlot] = useState(
     (players.find((p) => p.isSearched) ?? players[0])?.slot,
@@ -201,6 +206,14 @@ export function MatchView({
       </div>
 
       <div className="w-full max-w-6xl mx-auto px-6 pb-10">
+        {note && (
+          <MatchNote
+            matchId={summary.matchId}
+            initial={note.initial}
+            knownTags={note.knownTags}
+            items={note.items}
+          />
+        )}
         <MatchTip />
         <TeamTables
           players={players}
