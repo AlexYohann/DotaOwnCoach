@@ -28,9 +28,11 @@ export function PlayerPeers({
   name,
   initial,
   nowMs,
+  title,
 }: {
   accountId: number;
   name: string;
+  title?: string; // padrão: "Quem joga com {nome}"
   initial: PeersSnapshot;
   nowMs: number;
 }) {
@@ -101,7 +103,7 @@ export function PlayerPeers({
     <section aria-labelledby="peers-title" className="w-full max-w-6xl mx-auto px-6 pb-8">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 id="peers-title" className="font-display text-2xl font-bold uppercase leading-none">
-          Quem joga com {name}
+          {title ?? `Quem joga com ${name}`}
         </h2>
         {meta && <p className="text-xs text-muted-foreground">{meta}</p>}
       </div>
