@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Pause, Play } from "lucide-react";
 import { HeroRender } from "@/components/hero-render";
 import {
   HERO_MOTION_EVENT,
@@ -120,9 +121,18 @@ export function HeroBanner({
               type="button"
               onClick={toggleMotion}
               aria-pressed={motion === "paused"}
-              className="rounded border border-line bg-background/60 px-2 py-0.5 hover:text-ink"
+              className="inline-flex items-center gap-1.5 rounded border border-line bg-background/60 px-2 py-0.5 hover:text-ink"
             >
-              {motion === "paused" ? "▶ Animar" : "⏸ Pausar animação"}
+              {/* ícone de traço, não o símbolo ⏸ (o Windows o desenha como emoji) */}
+              {motion === "paused" ? (
+                <>
+                  <Play aria-hidden className="h-3 w-3" strokeWidth={2} /> Animar
+                </>
+              ) : (
+                <>
+                  <Pause aria-hidden className="h-3 w-3" strokeWidth={2} /> Pausar animação
+                </>
+              )}
             </button>
           )}
         </div>
