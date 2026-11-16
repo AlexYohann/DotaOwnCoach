@@ -78,11 +78,11 @@ describe("leituras (o banco filtra pelo dono)", () => {
     expect(calls).toContainEqual({ method: "eq", args: ["match_id", 9086036471] });
   });
 
-  it("getMyNotes: mais recentes primeiro, até 2.000", async () => {
+  it("getMyNotes: mais recentes primeiro, até 1.000 (máximo do PostgREST)", async () => {
     result = { data: [row], error: null };
     await expect(getMyNotes()).resolves.toEqual([asNote]);
     expect(calls).toContainEqual({ method: "order", args: ["played_at", { ascending: false }] });
-    expect(calls).toContainEqual({ method: "limit", args: [2000] });
+    expect(calls).toContainEqual({ method: "limit", args: [1000] });
   });
 
   it("getMyNotesFor devolve um mapa por partida; lista vazia não consulta", async () => {

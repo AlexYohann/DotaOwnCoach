@@ -36,6 +36,7 @@ export function DiarySummaryView({
         <TagColumn
           title="Mais deu errado"
           side="bad"
+          untagged={summary.untaggedBad}
           stats={summary.bad}
           total={summary.total}
           heroes={heroes}
@@ -44,6 +45,7 @@ export function DiarySummaryView({
         <TagColumn
           title="Mais deu certo"
           side="good"
+          untagged={summary.untaggedGood}
           stats={summary.good}
           total={summary.total}
           heroes={heroes}
@@ -89,6 +91,7 @@ function TagColumn({
   title,
   side,
   stats,
+  untagged,
   total,
   heroes,
   accountId,
@@ -96,6 +99,7 @@ function TagColumn({
   title: string;
   side: "good" | "bad";
   stats: TagStat[];
+  untagged: TagStat["texts"];
   total: number;
   heroes: Record<number, Hero>;
   accountId: number;
@@ -105,8 +109,8 @@ function TagColumn({
       <h3 className={cn("text-xs font-semibold uppercase tracking-wide", side === "bad" ? "text-loss" : "text-win")}>
         {title}
       </h3>
-      {stats.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">Nenhuma etiqueta marcada neste filtro.</p>
+      {stats.length === 0 && untagged.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">Nada anotado deste lado neste filtro.</p>
       ) : (
         <ul className="mt-2 flex flex-col gap-4">
           {stats.map((s) => (
@@ -132,6 +136,14 @@ function TagColumn({
               )}
             </li>
           ))}
+          {untagged.length > 0 && (
+            <li>
+              <p className="text-sm font-semibold text-muted-foreground">
+                Sem etiqueta <span className="text-xs font-normal">· {untagged.length}</span>
+              </p>
+              <TextList texts={untagged} side={side} heroes={heroes} accountId={accountId} />
+            </li>
+          )}
         </ul>
       )}
     </section>

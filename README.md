@@ -85,12 +85,12 @@ Dividida em 2026-11-10 (decisão do Alex): o login virou a parte arriscada e nã
   - Só para quem está logado. Partida ainda não processada pela OpenDota: o site pede a análise do replay e a linha do tempo aparece sozinha.
   - Pronto quando: na partida 9070527945 (Anti-Mage), minuto 16 mostra ouro 785 / GPM 523 / XP 1.019 / XPM 516, e uma partida recente não processada ganha a linha do tempo sozinha.
 - **v2.3: quem joga comigo (feito, 2026-11-15).** As pessoas com quem você mais joga e como vocês se saem juntos (`/players/{id}/peers` da OpenDota), na página do jogador, recentes primeiro; cada nome leva às partidas daquela pessoa. A lista fica no banco e é renovada em segundo plano, porque a OpenDota leva ~45 s para montá-la. Não usa a lista de amigos da Steam, que exigiria chave da API e lista pública.
-- **v2.4: diário.**
-  - **Pré-requisito (feito em 2026-11-12): backup automático do banco**, em `.github/workflows/backup-db.yml`; ver "Como voltar uma versão". Motivo original: As notas são escritas pelos usuários e não existem em nenhum outro lugar. O plano gratuito do Supabase não garante backup: antes de abrir o diário, uma tarefa agendada (GitHub Actions) exporta o banco todo dia (`supabase db dump`) e guarda as últimas cópias fora do Supabase. Alternativa paga: plano Pro (7 dias de backups diários).
-  - Tabela `match_notes`, com uma nota por partida: o que errou, o que fez bem e tags.
-  - RLS privado: cada usuário só lê e edita as próprias notas.
-  - Notas ao lado de cada partida em "Minhas partidas".
-  - **Pronto quando:** com duas contas, nenhuma enxerga as notas da outra. Esse teste é obrigatório.
+- **v2.4: diário (feito, 2026-11-16).** Design: `docs/superpowers/specs/2026-11-16-v2-4-diario-design.md`.
+  - **Pré-requisito (feito em 2026-11-12): backup automático do banco**, em `.github/workflows/backup-db.yml`; ver "Como voltar uma versão". As notas são escritas pelos usuários e não existem em nenhum outro lugar.
+  - Nota privada por partida (deu certo / deu errado com etiquetas e texto, itens que faltaram com o motivo), perfil com abas (Partidas / Quem joga comigo / Diário) e resumo com setas de evolução e filtros por período, herói ou partidas escolhidas.
+  - Tabela `match_notes` com RLS por dono; o servidor grava com a sessão do usuário.
+  - **Pronto quando:** com duas contas, nenhuma enxerga as notas da outra (`supabase/tests/v2_4_match_notes_rls.sql`, conferido no banco).
+- **Ideia futura: o site sugerir itens sozinho**, olhando os heróis inimigos da partida (o Alex gostou, 2026-11-16). Precisa de regras ou de IA; projeto à parte.
 - **Depois: idioma.** Seletor português/inglês no cabeçalho. Fica para depois do diário porque mexe em todos os textos do site.
 
 ### v3: metas e evolução

@@ -63,6 +63,8 @@ export default function DiaryPage({
             return (
               <div className="w-full max-w-6xl mx-auto px-6 pb-10">
                 <DiaryFilters
+                  // novo filtro = estado novo (escolhas e lista aberta não sobrevivem ao "Limpar")
+                  key={JSON.stringify(filter)}
                   base={base}
                   filter={filter}
                   heroes={heroOptions(notes).map((h) => ({ ...h, name: heroName(h.heroId) }))}

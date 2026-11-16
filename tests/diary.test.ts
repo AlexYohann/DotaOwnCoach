@@ -206,6 +206,25 @@ describe("selectNotes", () => {
     expect(r.previous).toBeNull();
   });
 
+  it("nota exatamente no limite da janela fica no período anterior", () => {
+    const edge = note({ playedAt: iso(NOW - 30 * DAY) });
+    const r = selectNotes([edge], { period: 30, heroId: null, matchIds: null }, NOW);
+    expect(r.current).toEqual([]);
+    expect(r.previous).toEqual([edge]);
+  });
+
+  it("mínimo de 3 notas antes vale depois do filtro de herói", () => {
+    const old = [
+      note({ heroId: 7, playedAt: iso(NOW - 40 * DAY), badTags: ["Farm"] }),
+      note({ heroId: 7, playedAt: iso(NOW - 41 * DAY), badTags: ["Farm"] }),
+      note({ heroId: 1, playedAt: iso(NOW - 42 * DAY), badTags: ["Farm"] }),
+    ];
+    const now = note({ heroId: 7, badTags: ["Farm"] });
+    const { current, previous } = selectNotes([now, ...old], { period: 30, heroId: 7, matchIds: null }, NOW);
+    expect(previous).toHaveLength(2);
+    expect(summarize(current, previous).bad[0].trend).toBeNull();
+  });
+
   it("tudo: todas as notas, sem anterior", () => {
     const a = note({ playedAt: iso(NOW - 900 * DAY) });
     const r = selectNotes([a], { period: "tudo", heroId: null, matchIds: null }, NOW);
@@ -285,7 +304,29 @@ describe("summarize", () => {
   });
 
   it("sem notas: tudo zerado", () => {
-    expect(summarize([], null)).toEqual({ total: 0, wins: 0, losses: 0, good: [], bad: [], items: [] });
+    expect(summarize([], null)).toEqual({
+      total: 0,
+      wins: 0,
+      losses: 0,
+      good: [],
+      bad: [],
+      items: [],
+      untaggedGood: [],
+      untaggedBad: [],
+    });
+  });
+
+  it("texto sem etiqueta naquele lado vai para 'sem etiqueta' (não some)", () => {
+    const s = summarize(
+      [
+        note({ badText: "morri 5x pro Pudge", playedAt: iso(NOW - 2 * DAY) }),
+        note({ badTags: ["Farm"], badText: "farm lento", goodText: "boa lane", playedAt: iso(NOW - DAY) }),
+      ],
+      null,
+    );
+    expect(s.untaggedBad.map((t) => t.text)).toEqual(["morri 5x pro Pudge"]);
+    expect(s.untaggedGood.map((t) => t.text)).toEqual(["boa lane"]);
+    expect(s.bad.map((t) => t.tag)).toEqual(["Farm"]);
   });
 });
 

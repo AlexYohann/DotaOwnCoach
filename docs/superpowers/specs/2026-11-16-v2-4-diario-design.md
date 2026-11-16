@@ -113,3 +113,12 @@ O site é um coach. Depois de uma partida, o Alex quer registrar o que deu certo
 ## Para quem for construir
 
 Textos exatos, espaçamento, ícones, o esqueleto de carregamento das abas e o componente de escolha de item (busca pelo nome sobre o mapa de itens da partida) ficam a critério de quem constrói, seguindo a paleta existente e os mockups.
+
+## Depois da revisão final (2026-11-16)
+
+Corrigido com teste: limite real de notas é 1.000 (máximo de linhas do PostgREST); a tela da partida e a rota leem só a nota da partida e só as etiquetas das outras; texto sem etiqueta aparece em "Sem etiqueta" no resumo; filtros não guardam a escolha antiga; limite de bytes dos itens afrouxado (migração `20261116020000_v2_4_items_check.sql`).
+
+Aceito, sem correção [minha escolha]:
+- Quem chamar a API REST direto com a própria sessão pode gravar `match_id`/herói/resultado arbitrários na própria nota. Só afeta o próprio diário; bloquear colunas no UPDATE quebraria o upsert normal.
+- Se a OpenDota cair sem dado salvo (ou a conta não tiver partidas públicas), o quadro do perfil mostra o erro e o Diário fica inacessível naquele momento. Raro; as notas continuam no banco.
+- O 404 do Diário para quem não é o dono volta com status HTTP 200 (o `notFound()` roda dentro do Suspense, depois do início do streaming). Nenhuma nota é lida nem enviada.

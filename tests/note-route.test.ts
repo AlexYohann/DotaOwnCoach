@@ -7,7 +7,7 @@ import type { Note } from "@/lib/diary";
 vi.mock("@/lib/account", () => ({ getViewerSession: vi.fn() }));
 vi.mock("@/lib/data", () => ({ getMatchData: vi.fn(), getItems: vi.fn() }));
 vi.mock("@/lib/notes-data", () => ({
-  getMyNotes: vi.fn(),
+  getMyTagNotes: vi.fn(),
   saveMyNote: vi.fn(),
   deleteMyNote: vi.fn(),
 }));
@@ -21,7 +21,7 @@ import { DELETE, PUT } from "@/app/match/[id]/note/route";
 const session = vi.mocked(account.getViewerSession);
 const getMatch = vi.mocked(data.getMatchData);
 const getItems = vi.mocked(data.getItems);
-const getMyNotes = vi.mocked(notes.getMyNotes);
+const getMyTagNotes = vi.mocked(notes.getMyTagNotes);
 const save = vi.mocked(notes.saveMyNote);
 const del = vi.mocked(notes.deleteMyNote);
 
@@ -57,7 +57,7 @@ beforeEach(() => {
   session.mockResolvedValue({ userId: "uuid-a", accountId: ME });
   getMatch.mockResolvedValue(match());
   getItems.mockResolvedValue({ 102: {} as never, 116: {} as never });
-  getMyNotes.mockResolvedValue([]);
+  getMyTagNotes.mockResolvedValue([]);
   save.mockResolvedValue(savedNote);
   del.mockResolvedValue(true);
 });
@@ -83,7 +83,7 @@ describe("PUT /match/[id]/note", () => {
   });
 
   it("etiqueta digitada ganha a grafia que o usuário já usa", async () => {
-    getMyNotes.mockResolvedValue([
+    getMyTagNotes.mockResolvedValue([
       { goodTags: ["Smoke bem feita"], badTags: [], createdAt: "2026-11-01T00:00:00Z" } as unknown as Note,
     ]);
     await put({ goodTags: ["SMOKE bem  feita"] });
@@ -131,6 +131,15 @@ describe("PUT /match/[id]/note", () => {
   it("banco falhou: 500", async () => {
     save.mockResolvedValue(null);
     expect((await put({ goodText: "x" })).status).toBe(500);
+  });
+});
+
+describe("leitura das etiquetas já usadas", () => {
+  it("só acontece se a nota trouxer etiqueta fora da lista fixa", async () => {
+    await put({ badTags: ["Mortes evitáveis", "farm"] });
+    expect(getMyTagNotes).not.toHaveBeenCalled();
+    await put({ badTags: ["Tilt"] });
+    expect(getMyTagNotes).toHaveBeenCalledTimes(1);
   });
 });
 

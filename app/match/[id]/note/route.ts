@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getViewerSession } from "@/lib/account";
 import { getItems, getMatchData } from "@/lib/data";
-import { knownTags, parseNoteInput } from "@/lib/diary";
+import { DEFAULT_TAGS, knownTags, parseNoteInput, tagKey } from "@/lib/diary";
 import { isWin } from "@/lib/match";
-import { deleteMyNote, getMyNotes, saveMyNote } from "@/lib/notes-data";
+import { deleteMyNote, getMyTagNotes, saveMyNote } from "@/lib/notes-data";
 import { OpenDotaError } from "@/lib/opendota";
 
 // Nota do diário (v2.4) de quem está logado nesta partida.
@@ -49,11 +49,12 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const me = match.players.find((p) => p.account_id === session.accountId);
   if (!me) return reply({ error: "Você só pode anotar partidas em que jogou." }, 403);
 
-  const [items, notes] = await Promise.all([getItems(), getMyNotes()]);
-  const parsed = parseNoteInput(body, {
-    itemIds: new Set(Object.keys(items).map(Number)),
-    known: knownTags(notes),
-  });
+  // Etiquetas já usadas só importam se o corpo trouxer alguma fora da lista fixa.
+  const [items, known] = await Promise.all([
+    getItems(),
+    hasCustomTags(body) ? getMyTagNotes().then(knownTags) : Promise.resolve([]),
+  ]);
+  const parsed = parseNoteInput(body, { itemIds: new Set(Object.keys(items).map(Number)), known });
   if (!parsed.ok) return reply({ error: parsed.error }, 400);
 
   if (parsed.empty) {
@@ -74,6 +75,16 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     parsed.note,
   );
   return saved ? reply({ note: saved }) : reply({ error: "Não foi possível salvar. Tente de novo." }, 500);
+}
+
+const FIXED = new Set(DEFAULT_TAGS.map(tagKey));
+
+function hasCustomTags(body: unknown): boolean {
+  if (typeof body !== "object" || body === null) return false;
+  const { goodTags, badTags } = body as { goodTags?: unknown; badTags?: unknown };
+  return [goodTags, badTags].some(
+    (list) => Array.isArray(list) && list.some((t) => typeof t === "string" && !FIXED.has(tagKey(t.trim()))),
+  );
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {

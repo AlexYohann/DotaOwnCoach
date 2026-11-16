@@ -17,7 +17,7 @@ import { heroKey } from "@/lib/hero-art";
 import { formatDuration, formatStartTime, unitLabel } from "@/lib/match";
 import { getHeroes, getItems, getMatchData } from "@/lib/data";
 import { knownTags } from "@/lib/diary";
-import { getMyNotes } from "@/lib/notes-data";
+import { getMyNote, getMyTagNotes } from "@/lib/notes-data";
 import {
   type Hero,
   type Item,
@@ -143,10 +143,11 @@ async function MatchContent({
   const viewerPlayed = viewerId !== null && match.players.some((p) => p.account_id === viewerId);
   let note: React.ComponentProps<typeof MatchView>["note"] = null;
   if (viewerPlayed) {
-    const notes = await getMyNotes();
+    // A nota desta partida + só as etiquetas das outras (sem os textos).
+    const [initial, tagNotes] = await Promise.all([getMyNote(match.match_id), getMyTagNotes()]);
     note = {
-      initial: notes.find((n) => n.matchId === match.match_id) ?? null,
-      knownTags: knownTags(notes),
+      initial,
+      knownTags: knownTags(tagNotes),
       // Itens que dá para comprar (sem receitas), em ordem alfabética.
       items: Object.values(items)
         .filter((it) => (it.cost ?? 0) > 0 && !it.key.startsWith("recipe_"))

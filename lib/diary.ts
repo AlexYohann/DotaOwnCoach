@@ -235,6 +235,9 @@ export type DiarySummary = {
   good: TagStat[];
   bad: TagStat[];
   items: ItemStat[];
+  // textos escritos num lado sem nenhuma etiqueta naquele lado (senão sumiriam do resumo)
+  untaggedGood: TagText[];
+  untaggedBad: TagText[];
 };
 
 const TREND_TOLERANCE = 0.05; // 5 pontos percentuais
@@ -290,6 +293,20 @@ function sideStats(
   return out.sort((a, b) => b.count - a.count || at(b) - at(a));
 }
 
+function untagged(current: Note[], side: "good" | "bad"): TagText[] {
+  return [...current]
+    .sort(newestFirst)
+    .filter((n) => (side === "good" ? n.goodTags : n.badTags).length === 0)
+    .map((n) => ({
+      matchId: n.matchId,
+      heroId: n.heroId,
+      won: n.won,
+      playedAt: n.playedAt,
+      text: side === "good" ? n.goodText : n.badText,
+    }))
+    .filter((t) => t.text);
+}
+
 export function summarize(current: Note[], previous: Note[] | null): DiarySummary {
   const items = new Map<number, ItemStat>();
   const itemLatest = new Map<number, number>();
@@ -314,6 +331,8 @@ export function summarize(current: Note[], previous: Note[] | null): DiarySummar
     items: [...items.values()].sort(
       (a, b) => b.count - a.count || (itemLatest.get(b.itemId) ?? 0) - (itemLatest.get(a.itemId) ?? 0),
     ),
+    untaggedGood: untagged(current, "good"),
+    untaggedBad: untagged(current, "bad"),
   };
 }
 

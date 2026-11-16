@@ -22,7 +22,9 @@ type NoteRow = {
 
 const COLUMNS =
   "match_id, hero_id, won, played_at, created_at, good_tags, bad_tags, good_text, bad_text, missing_items";
-const MAX_NOTES = 2000;
+// O PostgREST do Supabase devolve no máximo 1.000 linhas por consulta (Max rows):
+// pedir mais não traz mais. Quem passar disso vê as 1.000 mais recentes.
+const MAX_NOTES = 1000;
 
 const logDb = (what: string, error: { code?: string; message?: string }) =>
   console.error(`[db] ${what}: ${error.code ?? ""} ${error.message ?? ""}`);
@@ -62,7 +64,7 @@ export async function getMyNote(matchId: number): Promise<Note | null> {
   return data ? rowToNote(data) : null;
 }
 
-/** Todas as notas de quem está logado, mais recentes primeiro (até 2.000). */
+/** Todas as notas de quem está logado, mais recentes primeiro (até 1.000). */
 export async function getMyNotes(): Promise<Note[]> {
   const { data, error } = await (await createClient())
     .from("match_notes")
@@ -75,6 +77,34 @@ export async function getMyNotes(): Promise<Note[]> {
     return [];
   }
   return data.map(rowToNote);
+}
+
+/**
+ * Só as etiquetas (e a data de criação) das notas de quem está logado: o
+ * bastante para knownTags, sem trazer os textos. Mais antigas primeiro.
+ */
+export async function getMyTagNotes(): Promise<Note[]> {
+  const { data, error } = await (await createClient())
+    .from("match_notes")
+    .select("match_id, good_tags, bad_tags, created_at")
+    .order("created_at", { ascending: true })
+    .limit(MAX_NOTES)
+    .returns<Pick<NoteRow, "match_id" | "good_tags" | "bad_tags" | "created_at">[]>();
+  if (error) {
+    logDb("ler etiquetas de match_notes", error);
+    return [];
+  }
+  return data.map((r) =>
+    rowToNote({
+      ...r,
+      hero_id: 0,
+      won: null,
+      played_at: r.created_at,
+      good_text: "",
+      bad_text: "",
+      missing_items: [],
+    }),
+  );
 }
 
 /** Notas de quem está logado nessas partidas (tabela de "Últimas partidas"). */
